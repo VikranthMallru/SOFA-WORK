@@ -680,11 +680,23 @@ def createScene(rootNode):
     TDCR(rootNode,
          enable_theta_optimization_cables=False,
          initial_theta_deg=0.0, resolution_deg=3)  # Set initial_theta_deg to 0.0 for no rotation
-    if 1:
-        add_rigid_object_from_stl(
+
+    add_rigid_object_from_stl(
     rootNode,  # or rootNode, or wherever you want it
-    name="myRigidSTLObject",
+    name="RigidCube",
     stl_path="cube.stl",
+    translation=[15, 100, -15],
+    rotation=[0, 0, 0],
+    scale=10.0,            # Adjust as needed for your mesh
+    total_mass=1.0,
+    volume=1.0,
+    color=[1,1,1,1],
+    isStatic=True
+    )
+    add_rigid_object_from_stl(
+    rootNode,  # or rootNode, or wherever you want it
+    name="RigidSphere",
+    stl_path="sphere.stl",
     translation=[15, 100, -15],
     rotation=[0, 0, 0],
     scale=10.0,            # Adjust as needed for your mesh
