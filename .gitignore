@@ -1,0 +1,14 @@
+# Ignore editor settings
+.vscode/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore build artifacts (if any)
+build/
+dist/
+
+# Ignore logs
+*.log
+
