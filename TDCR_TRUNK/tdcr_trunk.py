@@ -12,7 +12,7 @@ import os
 import csv
 import numpy as np
 # from matplotlib import pyplot as plt
-from cuda_elastic import CudaElasticMaterialObject
+# from cuda_elastic import CudaElasticMaterialObject
 def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -142,6 +142,7 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
 
 
 
+
 def TDCR_trunk(parentNode, name="TDCR_trunk",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
          fixingBox=[-1,-4,-1,50.52,10,50.52] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
@@ -149,32 +150,20 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     tdcr = parentNode.addChild(name)
 
     # Deformable object (visual + FEM)
-    # soft_body = ElasticMaterialObject(tdcr,
-    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
-    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
-    #     collisionMesh="tdcr_trunk_collision.stl",
-    #     withConstraint=False,
-    #     youngModulus=600_000.0,  # Young's modulus in Pascals
-    #     poissonRatio=0.00,
-    #     totalMass=0.115,
-    #     # materialType="NeoHookean",
-    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
-    #     rotation=rotation,
-    #     translation=translation
-    # )
-    soft_body = CudaElasticMaterialObject(tdcr,
+    soft_body = ElasticMaterialObject(tdcr,
         volumeMeshFileName="tdcr_trunk_volume.vtk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
         withConstraint=False,
-        youngModulus=60_000.0,  # Young's modulus in Pascals
-        poissonRatio=0.30,
+        youngModulus=600_000.0,  # Young's modulus in Pascals
+        poissonRatio=0.00,
         totalMass=0.115,
         # materialType="NeoHookean",
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
         rotation=rotation,
         translation=translation
     )
+
     
     # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
     soft_body.collisionmodel.LineCollisionModel.selfCollision = True
@@ -309,7 +298,7 @@ def loadRequiredPlugins(rootNode):
     rootNode.addObject('RequiredPlugin', name='Sofa.Component.Visual') # Needed to use components [VisualStyle] 
     rootNode.addObject('CollisionPipeline', name='collisionPipeline')
     rootNode.addObject('RequiredPlugin', name='Sofa.Component.MechanicalLoad') # Needed to use components [ConstantForceField]
-    # rootNode.addObject('RequiredPlugin', name='SofaCUDA')
+    rootNode.addObject('RequiredPlugin', name='SofaCUDA')
     rootNode.addObject('RequiredPlugin', name='Sofa.Component.IO.Mesh') # Needed to use components [MeshVTKLoader]  
     rootNode.addObject('RequiredPlugin', name='Sofa.GL.Component.Rendering3D') # Needed to use components [OglSceneFrame]
     rootNode.addObject('RequiredPlugin', name='Sofa.Component.LinearSolver.Iterative')
@@ -330,6 +319,10 @@ def createScene(rootNode):
     rootNode.bbox = "-50 -50 -50 50 50 50"
     # rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields showWireframe"
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
+
+
     TDCR_trunk(rootNode,minForce=0.1)
     # TDCR_trunk(rootNode)
+
+
     return rootNode

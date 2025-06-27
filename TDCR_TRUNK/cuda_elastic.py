@@ -41,9 +41,9 @@ def CudaElasticMaterialObject(
     node.addObject('EulerImplicitSolver', name='odesolver')
     node.addObject('CGLinearSolver', name='linearsolver')
     node.addObject('TetrahedronSetTopologyContainer', src='@loader', name='container')
-    node.addObject('CudaMechanicalObject', template='CudaVec3f', name='dofs')
+    node.addObject('MechanicalObject', template='CudaVec3f', name='dofs')
     node.addObject('UniformMass', totalMass=totalMass, name='mass')
-    node.addObject('CudaTetrahedronFEMForceField', template='CudaVec3f',
+    node.addObject('CudaTetrahedronTLEDForceField', template='CudaVec3f',
                    name='forcefield',
                    poissonRatio=poissonRatio,
                    youngModulus=youngModulus)
