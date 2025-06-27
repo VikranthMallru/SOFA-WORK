@@ -620,9 +620,9 @@ def TDCR(parentNode, name="TDCR",
     )
 
 
-    # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True 
+    soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True 
     soft_body.collisionmodel.LineCollisionModel.selfCollision = True
-    # soft_body.collisionmodel.PointCollisionModel.selfCollision = True
+    soft_body.collisionmodel.PointCollisionModel.selfCollision = True
 
     soft_body.addObject(controller)
 
@@ -672,14 +672,15 @@ def createScene(rootNode):
     MainHeader(rootNode, gravity=[0.0, -981.0, 0.0],
                plugins=["SoftRobots"])
     ContactHeader(rootNode,
-                  alarmDistance=2.0,
+                  alarmDistance=1.0,
                   contactDistance=0.1,
                   frictionCoef=0.08)
     rootNode.bbox = "-50 -50 -50 50 50 50"
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
     TDCR(rootNode,
          enable_theta_optimization_cables=False,
-         initial_theta_deg=0.0, resolution_deg=3)  # Set initial_theta_deg to 0.0 for no rotation
+         initial_theta_deg=0.0, resolution_deg=3,
+         minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
     # add_rigid_object_from_stl(
     # rootNode,  # or rootNode, or wherever you want it
@@ -693,18 +694,18 @@ def createScene(rootNode):
     # color=[1,1,1,1],
     # isStatic=True
     # )
-    add_rigid_object_from_stl(
-    rootNode,  # or rootNode, or wherever you want it
-    name="RigidSphere",
-    stl_path="sphere.stl",
-    translation=[15, 100, -15],
-    rotation=[0, 0, 0],
-    scale=10.0,            # Adjust as needed for your mesh
-    total_mass=1.0,
-    volume=1.0,
-    color=[1,1,1,1],
-    isStatic=True
-    )
+    # add_rigid_object_from_stl(
+    # rootNode,  # or rootNode, or wherever you want it
+    # name="RigidSphere",
+    # stl_path="sphere.stl",
+    # translation=[15, 100, -15],
+    # rotation=[0, 0, 0],
+    # scale=10.0,            # Adjust as needed for your mesh
+    # total_mass=1.0,
+    # volume=1.0,
+    # color=[1,1,1,1],
+    # isStatic=True
+    # )
     
 
     return rootNode
