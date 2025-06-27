@@ -39,7 +39,7 @@ def CudaElasticMaterialObject(
     # CUDA-based mechanics
     node.addObject('RequiredPlugin', pluginName='SofaCUDA')
     node.addObject('EulerImplicitSolver', name='odesolver')
-    node.addObject('CudaCGLinearSolver', name='linearsolver')
+    node.addObject('CGLinearSolver', name='linearsolver')
     node.addObject('TetrahedronSetTopologyContainer', src='@loader', name='container')
     node.addObject('CudaMechanicalObject', template='CudaVec3f', name='dofs')
     node.addObject('UniformMass', totalMass=totalMass, name='mass')
