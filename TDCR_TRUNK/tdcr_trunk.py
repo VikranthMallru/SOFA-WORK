@@ -8,13 +8,11 @@ from stlib3.physics.collision import CollisionMesh
 from splib3.loaders import loadPointListFromFile
 from stlib3.scene import MainHeader, ContactHeader
 import sys
-# from cuda_elastic import CudaElasticMaterialObject
 import os
 import csv
 import numpy as np
 # from matplotlib import pyplot as plt
-from cuda_elastic_prefab import CudaElasticMaterialObject
-
+from cuda_elastic import CudaElasticMaterialObject
 def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -169,8 +167,8 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
         withConstraint=False,
-        youngModulus=600_000.0,  # Young's modulus in Pascals
-        poissonRatio=0.00,
+        youngModulus=60_000.0,  # Young's modulus in Pascals
+        poissonRatio=0.30,
         totalMass=0.115,
         # materialType="NeoHookean",
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
