@@ -268,14 +268,14 @@ def add_rigid_object_from_stl(parent_node,
     collision.addObject('MeshTopology', src="@loader")
     collision.addObject('MechanicalObject')
     # Set moving=False, simulated=False if static (like your floor)
-    if isStatic:
-        collision.addObject('TriangleCollisionModel', moving=False, simulated=False)
-        collision.addObject('LineCollisionModel', moving=False, simulated=False)
-        collision.addObject('PointCollisionModel', moving=False, simulated=False)
-    else:
-        collision.addObject('TriangleCollisionModel')
-        collision.addObject('LineCollisionModel')
-        collision.addObject('PointCollisionModel')
+    # if isStatic:
+    collision.addObject('TriangleCollisionModel', moving= not isStatic, simulated=not isStatic)
+    collision.addObject('LineCollisionModel', moving=not isStatic, simulated=not isStatic)
+    collision.addObject('PointCollisionModel', moving=not isStatic, simulated=not isStatic)
+    # else:
+    #     collision.addObject('TriangleCollisionModel')
+    #     collision.addObject('LineCollisionModel')
+    #     collision.addObject('PointCollisionModel')
     collision.addObject('RigidMapping')
 
     # Visualization subnode using STL
@@ -515,19 +515,7 @@ def TDCR(parentNode, name="TDCR",
     #     isAStaticObject=False
     # )
     # tdcr.addChild(rigidBody)
-    if 1:
-        add_rigid_object_from_stl(
-        tdcr,  # or rootNode, or wherever you want it
-        name="myRigidSTLObject",
-        stl_path="cube.stl",
-        translation=[15, 100, -15],
-        rotation=[0, 0, 0],
-        scale=10.0,            # Adjust as needed for your mesh
-        total_mass=1.0,
-        volume=1.0,
-        color=[1,1,1,1],
-        isStatic=True
-        )
+
     #############################################################################################################
 
     soft_body.addObject('LinearSolverConstraintCorrection')
@@ -692,8 +680,19 @@ def createScene(rootNode):
     TDCR(rootNode,
          enable_theta_optimization_cables=False,
          initial_theta_deg=0.0, resolution_deg=3)  # Set initial_theta_deg to 0.0 for no rotation
-    # TDCR(rootNode)
-    # Example: Adding a rigid sphere
+    if 1:
+        add_rigid_object_from_stl(
+    rootNode,  # or rootNode, or wherever you want it
+    name="myRigidSTLObject",
+    stl_path="cube.stl",
+    translation=[15, 100, -15],
+    rotation=[0, 0, 0],
+    scale=10.0,            # Adjust as needed for your mesh
+    total_mass=1.0,
+    volume=1.0,
+    color=[1,1,1,1],
+    isStatic=True
+    )
 
     return rootNode
 
