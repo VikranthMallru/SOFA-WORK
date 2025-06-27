@@ -1,6 +1,6 @@
-import Sofa.Core
+from Sofa.prefab import Prefab
 
-class CudaElasticMaterialObject(Sofa.Core.Prefab):
+class CudaElasticMaterialObject(Prefab):
     prefabParameters = [
         {'name': 'volumeMeshFileName', 'type': 'string', 'help': 'Path to the tetrahedral mesh file'},
         {'name': 'name', 'type': 'string', 'help': 'Name of the object', 'default': 'CudaElasticMaterialObject'},
@@ -13,27 +13,26 @@ class CudaElasticMaterialObject(Sofa.Core.Prefab):
         {'name': 'totalMass', 'type': 'float', 'help': 'Total mass', 'default': 1.0}
     ]
 
-    def __init__(self, **kwargs):
-        Sofa.Core.Prefab.__init__(self, **kwargs)
-
     def init(self):
         node = self.parent.addChild(self.name.value)
-        # Mesh loader
-        if self.volumeMeshFileName.value.endswith('.msh'):
+
+        # Mesh loader selection
+        meshfile = self.volumeMeshFileName.value
+        if meshfile.endswith('.msh'):
             loader = node.addObject('MeshGmshLoader', name='loader',
-                                   filename=self.volumeMeshFileName.value,
+                                   filename=meshfile,
                                    rotation=self.rotation.value,
                                    translation=self.translation.value,
                                    scale3d=self.scale.value)
-        elif self.volumeMeshFileName.value.endswith('.gidmsh'):
+        elif meshfile.endswith('.gidmsh'):
             loader = node.addObject('GIDMeshLoader', name='loader',
-                                   filename=self.volumeMeshFileName.value,
+                                   filename=meshfile,
                                    rotation=self.rotation.value,
                                    translation=self.translation.value,
                                    scale3d=self.scale.value)
         else:
             loader = node.addObject('MeshVTKLoader', name='loader',
-                                   filename=self.volumeMeshFileName.value,
+                                   filename=meshfile,
                                    rotation=self.rotation.value,
                                    translation=self.translation.value,
                                    scale3d=self.scale.value)
@@ -49,6 +48,7 @@ class CudaElasticMaterialObject(Sofa.Core.Prefab):
                        name='forcefield',
                        poissonRatio=self.poissonRatio.value,
                        youngModulus=self.youngModulus.value)
+
         # Visual model (optional)
         if self.surfaceMeshFileName.value:
             visNode = node.addChild('VisualModel')
@@ -56,5 +56,4 @@ class CudaElasticMaterialObject(Sofa.Core.Prefab):
             visNode.addObject('OglModel', src='@loader')
             visNode.addObject('BarycentricMapping', input='@../dofs', output='@dofs')
 
-        # Return node for further customization
         return node

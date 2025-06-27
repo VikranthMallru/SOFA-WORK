@@ -13,7 +13,7 @@ import os
 import csv
 import numpy as np
 # from matplotlib import pyplot as plt
-
+from cuda_elastic_prefab import CudaElasticMaterialObject
 
 def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
@@ -151,7 +151,20 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     tdcr = parentNode.addChild(name)
 
     # Deformable object (visual + FEM)
-    soft_body = ElasticMaterialObject(tdcr,
+    # soft_body = ElasticMaterialObject(tdcr,
+    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
+    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
+    #     collisionMesh="tdcr_trunk_collision.stl",
+    #     withConstraint=False,
+    #     youngModulus=600_000.0,  # Young's modulus in Pascals
+    #     poissonRatio=0.00,
+    #     totalMass=0.115,
+    #     # materialType="NeoHookean",
+    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
+    #     rotation=rotation,
+    #     translation=translation
+    # )
+    soft_body = CudaElasticMaterialObject(tdcr,
         volumeMeshFileName="tdcr_trunk_volume.vtk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
@@ -164,6 +177,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
         rotation=rotation,
         translation=translation
     )
+    
     # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
     soft_body.collisionmodel.LineCollisionModel.selfCollision = True
     # soft_body.collisionmodel.PointCollisionModel.selfCollision = True
