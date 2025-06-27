@@ -12,4 +12,5 @@ dist/
 # Ignore logs
 *.log
 
+# Ignore CSV changes
 *.csv
