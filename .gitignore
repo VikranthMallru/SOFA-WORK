@@ -12,3 +12,4 @@ dist/
 # Ignore logs
 *.log
 
+*.csv
