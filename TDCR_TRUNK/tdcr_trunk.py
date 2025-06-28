@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import Sofa.Core
 import Sofa.constants.Key as Key
-# from stlib3.physics.deformable import ElasticMaterialObject
+from stlib3.physics.deformable import ElasticMaterialObject
 from stlib3.physics.constraints import FixedBox
 from softrobots.actuators import PullingCable
 from stlib3.physics.collision import CollisionMesh
@@ -12,7 +12,7 @@ import os
 import csv
 import numpy as np
 # from matplotlib import pyplot as plt
-from cuda_elastic import CudaElasticMaterialObject
+# from cuda_elastic import CudaElasticMaterialObject
 def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -148,33 +148,33 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
          fixingBox=[-1,-4,-1,50.52,10,50.52] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
 # fixingBox=  
     tdcr = parentNode.addChild(name)
-
+# 
     # Deformable object (visual + FEM)
-    # soft_body = ElasticMaterialObject(tdcr,
-    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
-    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
-    #     collisionMesh="tdcr_trunk_collision.stl",
-    #     withConstraint=False,
-    #     youngModulus=600_000.0,  # Young's modulus in Pascals
-    #     poissonRatio=0.00,
-    #     totalMass=0.115,
-    #     # materialType="NeoHookean",
-    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
-    #     rotation=rotation,
-    #     translation=translation
-    # )
-    soft_body = CudaElasticMaterialObject(tdcr,
+    soft_body = ElasticMaterialObject(tdcr,
         volumeMeshFileName="tdcr_trunk_volume.vtk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
-        withConstrain=False,
+        withConstraint=False,
         youngModulus=600_000.0,  # Young's modulus in Pascals
         poissonRatio=0.00,
         totalMass=0.115,
+        # materialType="NeoHookean",
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
         rotation=rotation,
         translation=translation
     )
+    # soft_body = CudaElasticMaterialObject(tdcr,
+    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
+    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
+    #     collisionMesh="tdcr_trunk_collision.stl",
+    #     withConstrain=False,
+    #     youngModulus=600_000.0,  # Young's modulus in Pascals
+    #     poissonRatio=0.00,
+    #     totalMass=0.115,
+    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
+    #     rotation=rotation,
+    #     translation=translation
+    # )
 
     
     # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
@@ -204,35 +204,35 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     y=0.0
     z=2.5
     delta = 0.1
-    roi.addObject("BoxROI",
-              name="roi",
-              box=[x-delta,y-delta,z-delta,x+delta,y+delta,z+delta],  # (xMin, yMin, zMin, xMax, yMax, zMax)
-              drawBoxes=True,
-              doUpdate=True)
-    roi.addObject("ConstantForceField",
-              name="roiConstForce",
-            #   indices="@roi.indices",
-              force=[0, 0, 0])
+    # roi.addObject("BoxROI",
+    #           name="roi",
+    #           box=[x-delta,y-delta,z-delta,x+delta,y+delta,z+delta],  # (xMin, yMin, zMin, xMax, yMax, zMax)
+    #           drawBoxes=True,
+    #           doUpdate=True)
+    # roi.addObject("ConstantForceField",
+    #           name="roiConstForce",
+    #         #   indices="@roi.indices",
+    #           force=[0, 0, 0])
     
-    roi.addObject("Monitor",
-    name="roiMonitor",
-    template="Vec3d",
-    listening=True,
-    indices="@roi.indices",
+    # roi.addObject("Monitor",
+    # name="roiMonitor",
+    # template="CudaVec3f",
+    # listening=True,
+    # indices="@roi.indices",
 
-    showPositions=True,
-    showVelocities=False,
+    # showPositions=True,
+    # showVelocities=False,
 
-    showTrajectories=True,
-    PositionsColor=[1.0, 0.0, 0.0, 1.0],
-    VelocitiesColor=[0.0, 1.0, 0.0, 1.0],
-    ForcesColor=[0.0, 0.0, 1.0, 1.0],
-    sizeFactor=0.8,
-    showMinThreshold=0.01,
-    TrajectoriesPrecision=0.1,
-    TrajectoriesColor= [1,1,0,1]
-    # ExportPath="/home/ci/my_files/TDCR_TRUNK/Plots/roiMonitor_"
-    )
+    # showTrajectories=True,
+    # PositionsColor=[1.0, 0.0, 0.0, 1.0],
+    # VelocitiesColor=[0.0, 1.0, 0.0, 1.0],
+    # ForcesColor=[0.0, 0.0, 1.0, 1.0],
+    # sizeFactor=0.8,
+    # showMinThreshold=0.01,
+    # TrajectoriesPrecision=0.1,
+    # TrajectoriesColor= [1,1,0,1]
+    # # ExportPath="/home/ci/my_files/TDCR_TRUNK/Plots/roiMonitor_"
+    # )
 
 
 
@@ -242,15 +242,16 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     c1 = loadPointListFromFile("cable1.json")
     c1_r = rotate_cable_points(c1, 95)
     # Lower the pull point by 3 units in y direction
-    pull1 = [c1_r[0][0], c1_r[0][1] - 3, c1_r[0][2]]
-    cable1 = PullingCable(soft_body,
-                          "PullingCable_1",
-                          pullPointLocation=pull1,
-                          rotation=rotation,
-                          translation=translation,
-                          cableGeometry=c1_r)
-    cable1.CableConstraint.minForce = minForce
-    cable1.CableConstraint.maxForce = maxForce
+    
+    # pull1 = [c1_r[0][0], c1_r[0][1] - 3, c1_r[0][2]]
+    # cable1 = PullingCable(soft_body,
+    #                       "PullingCable_1",
+    #                       pullPointLocation=pull1,
+    #                       rotation=rotation,
+    #                       translation=translation,
+    #                       cableGeometry=c1_r)
+    # cable1.CableConstraint.minForce = minForce
+    # cable1.CableConstraint.maxForce = maxForce
 
     c2_r = rotate_cable_points(c1, 270)
     # Lower the pull point by 3 units in y direction
@@ -322,7 +323,7 @@ def loadRequiredPlugins(rootNode):
 def createScene(rootNode):
     
     loadRequiredPlugins(rootNode)
-    MainHeader(rootNode, gravity=[0.0, -981.0, 0.0], 
+    MainHeader(rootNode, gravity=[0.0, 0.0, 0.0], 
                plugins=["SoftRobots"])
 
     ContactHeader(rootNode, 
