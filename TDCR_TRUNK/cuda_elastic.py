@@ -143,6 +143,10 @@ class CudaElasticMaterialObject(Sofa.Prefab):
         self.collisionmodel.addObject('PointCollisionModel')
         self.collisionmodel.addObject('BarycentricMapping')
 
+        self.collisionmodel.TriangleCollisionModel.selfCollision = True
+        self.collisionmodel.LineCollisionModel.selfCollision = True
+        self.collisionmodel.PointCollisionModel.selfCollision = True
+
     def addVisualModel(self, filename, color, rotation, translation, scale=[1., 1., 1.]):
         visualmodel = self.addChild(VisualModel(
             visualMeshPath=filename,

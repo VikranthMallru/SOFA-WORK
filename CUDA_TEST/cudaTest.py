@@ -49,7 +49,7 @@ def createScene(rootNode):
     trunk.addObject('DiagonalMass', name="DiagonalMass", template="CudaVec3f,CudaVec3f", massDensity=1)
     trunk.addObject('TetrahedronFEMForceField', name="FEM", template="CudaVec3f", method="large",
                     poissonRatio=0.3, youngModulus=60_000, computeGlobalMatrix=0)
-    trunk.addObject('FixedConstraint', name="FixedConstraint", template="CudaVec3f", topology="@topo", indices=[3, 39, 64])
+    # trunk.addObject('FixedConstraint', name="FixedConstraint", template="CudaVec3f", topology="@topo", indices=[3, 39, 64])
 
     # Visualization node
     visu = trunk.addChild('Visu')
@@ -64,9 +64,9 @@ def createScene(rootNode):
     rootNode.addObject('BVHNarrowPhase')
     rootNode.addObject('DefaultContactManager', name="collision response", response="PenalityContactForceField")
     rootNode.addObject('DiscreteIntersection')
-    
+
     # In your trunk node (after loading the mesh and mechanical object)
     trunk.addObject('TriangleCollisionModel')
     trunk.addObject('LineCollisionModel')
     trunk.addObject('PointCollisionModel')
-    
+

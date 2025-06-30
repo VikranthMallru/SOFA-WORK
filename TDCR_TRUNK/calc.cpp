@@ -9,7 +9,7 @@ int main() {
     vector<double> y_values;
     vector<double> x_values;
     const double x = 24.76;
-    const double delta = 2;
+    const double delta = 0;
     // Calculate cumulative y values
     double y = 0.0;
     for (double dy : delta_y) {

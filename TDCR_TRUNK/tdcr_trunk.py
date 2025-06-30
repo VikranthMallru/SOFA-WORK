@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import Sofa.Core
 import Sofa.constants.Key as Key
-from stlib3.physics.deformable import ElasticMaterialObject
+# from stlib3.physics.deformable import ElasticMaterialObject
 from stlib3.physics.constraints import FixedBox
 from softrobots.actuators import PullingCable
 from stlib3.physics.collision import CollisionMesh
@@ -12,7 +12,7 @@ import os
 import csv
 import numpy as np
 # from matplotlib import pyplot as plt
-# from cuda_elastic import CudaElasticMaterialObject
+from cuda_elastic import CudaElasticMaterialObject
 def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -33,7 +33,7 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         super().__init__(*args, **kwargs)
         self.cables = cable_nodes  # List of 2 cable nodes
         self.name = "TDCR_trunk_Controller"
-        self.displacement_step = 1
+        self.displacement_step = 0.1
         self.max_displacement = 10000
         self.min_displacement = -10000
         self.roi_node = roi_node
@@ -150,31 +150,31 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     tdcr = parentNode.addChild(name)
 # 
     # Deformable object (visual + FEM)
-    soft_body = ElasticMaterialObject(tdcr,
-        volumeMeshFileName="tdcr_trunk_volume.vtk",
-        surfaceMeshFileName="tdcr_trunk_surface.stl",
-        collisionMesh="tdcr_trunk_collision.stl",
-        withConstraint=False,
-        youngModulus=600_000.0,  # Young's modulus in Pascals
-        poissonRatio=0.00,
-        totalMass=0.115,
-        # materialType="NeoHookean",
-        surfaceColor=[0.96, 0.87, 0.70, 1.0],
-        rotation=rotation,
-        translation=translation
-    )
-    # soft_body = CudaElasticMaterialObject(tdcr,
+    # soft_body = ElasticMaterialObject(tdcr,
     #     volumeMeshFileName="tdcr_trunk_volume.vtk",
     #     surfaceMeshFileName="tdcr_trunk_surface.stl",
     #     collisionMesh="tdcr_trunk_collision.stl",
-    #     withConstrain=False,
+    #     withConstraint=False,
     #     youngModulus=600_000.0,  # Young's modulus in Pascals
     #     poissonRatio=0.00,
     #     totalMass=0.115,
+    #     # materialType="NeoHookean",
     #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
     #     rotation=rotation,
     #     translation=translation
     # )
+    soft_body = CudaElasticMaterialObject(tdcr,
+        volumeMeshFileName="tdcr_trunk_volume.vtk",
+        surfaceMeshFileName="tdcr_trunk_surface.stl",
+        collisionMesh="tdcr_trunk_collision.stl",
+        withConstrain=False,
+        youngModulus=60_000.0,  # Young's modulus in Pascals
+        poissonRatio=0.00,
+        totalMass=0.115,
+        surfaceColor=[0.96, 0.87, 0.70, 1.0],
+        rotation=rotation,
+        translation=translation
+    )
 
     
     # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
@@ -240,18 +240,18 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     
     #Add the Cables
     c1 = loadPointListFromFile("cable1.json")
-    c1_r = rotate_cable_points(c1, 95)
+    c1_r = rotate_cable_points(c1, 90)
     # Lower the pull point by 3 units in y direction
-    
-    # pull1 = [c1_r[0][0], c1_r[0][1] - 3, c1_r[0][2]]
-    # cable1 = PullingCable(soft_body,
-    #                       "PullingCable_1",
-    #                       pullPointLocation=pull1,
-    #                       rotation=rotation,
-    #                       translation=translation,
-    #                       cableGeometry=c1_r)
-    # cable1.CableConstraint.minForce = minForce
-    # cable1.CableConstraint.maxForce = maxForce
+
+    pull1 = [c1_r[0][0], c1_r[0][1] - 3, c1_r[0][2]]
+    cable1 = PullingCable(soft_body,
+                          "PullingCable_1",
+                          pullPointLocation=pull1,
+                          rotation=rotation,
+                          translation=translation,
+                          cableGeometry=c1_r)
+    cable1.CableConstraint.minForce = minForce
+    cable1.CableConstraint.maxForce = maxForce
 
     c2_r = rotate_cable_points(c1, 270)
     # Lower the pull point by 3 units in y direction
