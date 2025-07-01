@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import Sofa.Core
 import Sofa.constants.Key as Key
-# from stlib3.physics.deformable import ElasticMaterialObject
+from stlib3.physics.deformable import ElasticMaterialObject
 from stlib3.physics.constraints import FixedBox
 from softrobots.actuators import PullingCable
 from stlib3.physics.collision import CollisionMesh
@@ -150,26 +150,27 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     tdcr = parentNode.addChild(name)
 # 
     # Deformable object (visual + FEM)
+    
     # soft_body = ElasticMaterialObject(tdcr,
     #     volumeMeshFileName="tdcr_trunk_volume.vtk",
     #     surfaceMeshFileName="tdcr_trunk_surface.stl",
     #     collisionMesh="tdcr_trunk_collision.stl",
     #     withConstraint=False,
     #     youngModulus=600_000.0,  # Young's modulus in Pascals
-    #     poissonRatio=0.00,
+    #     poissonRatio=0.20,
     #     totalMass=0.115,
-    #     # materialType="NeoHookean",
     #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
     #     rotation=rotation,
     #     translation=translation
     # )
+
     soft_body = CudaElasticMaterialObject(tdcr,
         volumeMeshFileName="tdcr_trunk_volume.vtk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
         withConstrain=False,
-        youngModulus=60_000.0,  # Young's modulus in Pascals
-        poissonRatio=0.00,
+        youngModulus=600_000.0,  # Young's modulus in Pascals
+        poissonRatio=0.20,
         totalMass=0.115,
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
         rotation=rotation,

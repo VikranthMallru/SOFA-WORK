@@ -37,14 +37,22 @@ class CudaElasticMaterialObject(Sofa.Prefab):
                 rayleighMass=0.1
             )
             self.solver = self.addObject(
-                'CGLinearSolver',
-                name="solver",
-                template='CompressedRowSparseMatrixMat3x3d',
-                iterations=25,
-                tolerance=1e-6,
-                threshold=1e-20
+            'CGLinearSolver',
+            name="solver",
+            template='CompressedRowSparseMatrixMat3x3d',
+            iterations=100,
+            tolerance=1e-8,  # More strict
+            threshold=1e-20
             )
-
+            # self.solver = self.addObject(
+            #     'CudaSparseLDLSolver',  # Direct solver on GPU
+            #     name="solver"
+            #     )
+            # self.solver = self.addObject(
+            #     'SparseLDLSolver',
+            #     name="solver"
+            #     )
+        
         # Mesh loading
         if self.volumeMeshFileName.value == '':
             Sofa.msg_error(self, "Unable to create an elastic object because there is no volume mesh provided.")
@@ -75,13 +83,12 @@ class CudaElasticMaterialObject(Sofa.Prefab):
         self.dofs = self.addObject('MechanicalObject', template='CudaVec3f', name='dofs')
         self.geometry = self.addObject('TetrahedronSetGeometryAlgorithms', template='CudaVec3f', name='GeomAlgo')
 
-        # Mass: Use DiagonalMass for stability (like in the XML)
         self.mass = self.addObject(
-            'DiagonalMass',
-            template='CudaVec3f,CudaVec3f',
-            massDensity=self.totalMass.value,  # You may want to adjust this if you want to match total mass exactly
-            name='DiagonalMass'
+            'UniformMass',
+            totalMass=self.totalMass.value,
+            name='UniformMass'
         )
+
 
         # FEM forcefield with CUDA and matrix-free (computeGlobalMatrix=False)
         self.forcefield = self.addObject(
@@ -143,9 +150,9 @@ class CudaElasticMaterialObject(Sofa.Prefab):
         self.collisionmodel.addObject('PointCollisionModel')
         self.collisionmodel.addObject('BarycentricMapping')
 
-        self.collisionmodel.TriangleCollisionModel.selfCollision = True
-        self.collisionmodel.LineCollisionModel.selfCollision = True
-        self.collisionmodel.PointCollisionModel.selfCollision = True
+        # self.collisionmodel.TriangleCollisionModel.selfCollision = True
+        # self.collisionmodel.LineCollisionModel.selfCollision = True
+        # self.collisionmodel.PointCollisionModel.selfCollision = True
 
     def addVisualModel(self, filename, color, rotation, translation, scale=[1., 1., 1.]):
         visualmodel = self.addChild(VisualModel(
