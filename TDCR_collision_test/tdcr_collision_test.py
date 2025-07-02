@@ -398,7 +398,7 @@ class TDCRController(Sofa.Core.Controller):
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
             DeltaLv = 15.0
             alpha_deg = 90.0
-            steps = 100
+            steps = 200
             interval = 0.1
             step_size = DeltaLv / steps
             self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
@@ -582,7 +582,7 @@ def loadRequiredPlugins(rootNode):
 def createScene(rootNode):
 
     loadRequiredPlugins(rootNode)
-    MainHeader(rootNode, gravity=[0.0, -981.0, 0.0],
+    MainHeader(rootNode, gravity=[0.0, 0.0, 0.0],
                plugins=["SoftRobots"])
     ContactHeader(rootNode,
                   alarmDistance=1.0,
@@ -607,21 +607,25 @@ def createScene(rootNode):
     # isStatic=True
     # )
 
-
-    # add_rigid_object_from_stl(
-    # rootNode,  
-    # name="RigidSphere",
-    # stl_path="sphere.stl",
-    # translation=[9, 70, -15],
-    # rotation=[0, 0, 0],
-    # scale=10.0,           
-    # total_mass=1.0,
-    # volume=1.0,
-    # color=[1,1,1,1],
-    # isStatic=True
-    # )
+    position = rotate_cable_points([[9, 40, -13]], 90.0)
+    
+    add_rigid_object_from_stl(
+    rootNode,  
+    name="RigidSphere",
+    stl_path="sphere.stl",
+    translation=position,
+    rotation=[0, 0, 0],
+    scale=20.0,           
+    total_mass=1.0,
+    volume=1.0,
+    color=[1,1,1,1],
+    isStatic=False
+    )
     
 
     return rootNode
 
 
+# 1)Grasping
+# 2)Collision pinpoint
+# 3)External Material rigidity detection
