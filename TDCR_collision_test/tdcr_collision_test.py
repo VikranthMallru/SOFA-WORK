@@ -151,15 +151,12 @@ def add_rigid_object_from_stl(parent_node,
     collision.addObject('MeshSTLLoader', name="loader", filename=stl_path, scale=scale)
     collision.addObject('MeshTopology', src="@loader")
     collision.addObject('MechanicalObject')
+
     # Set moving=False, simulated=False if static (like your floor)
-    # if isStatic:
     collision.addObject('TriangleCollisionModel', moving= not isStatic, simulated=not isStatic)
     collision.addObject('LineCollisionModel', moving=not isStatic, simulated=not isStatic)
     collision.addObject('PointCollisionModel', moving=not isStatic, simulated=not isStatic)
-    # else:
-    #     collision.addObject('TriangleCollisionModel')
-    #     collision.addObject('LineCollisionModel')
-    #     collision.addObject('PointCollisionModel')
+
     collision.addObject('RigidMapping')
 
     # Visualization subnode using STL
@@ -170,183 +167,7 @@ def add_rigid_object_from_stl(parent_node,
 
     return rigid
 
-
-
-
-class TDCRController(Sofa.Core.Controller):
-    def __init__(self,
-                 cable_nodes,
-                 roi_nodes,
-                 soft_body_node,
-                 csv_file,
-                 roi_box_centers,
-                 spine_csv_file,
-                 root= None,
-                 n_triplets=None,
-                 resolution_deg=None,
-                 enable_theta_optimization_cables=True,
-                 initial_theta_deg=0.0,
-                 *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.name = "TDCRController"
-        # self.displacement_step = 0.1
-        self.displacement_step = 0.5
-        self.pull_keys = {"1": 0, "2": 1, "3": 2}
-        self.release_keys = {"!": 0, "@": 1, "#": 2}
-        self.cables = cable_nodes
-        self.roi_nodes = roi_nodes
-        self.soft_body_node = soft_body_node
-        self.csv_file = csv_file
-        self.roi_box_centers = roi_box_centers
-        self.spine_csv_file = spine_csv_file
-        self.root = root
-        self.n_triplets = n_triplets
-        self.resolution_deg = resolution_deg
-        self.enable_theta_optimization_cables = enable_theta_optimization_cables
-        self.initial_theta_deg = initial_theta_deg
-        self.listening = True
-
-
-        # Clean the CSV file at every restart
-        os.makedirs(os.path.dirname(self.csv_file), exist_ok=True)
-        with open(self.csv_file, "w", newline="") as f:
-            pass
-        os.makedirs(os.path.dirname(self.spine_csv_file), exist_ok=True)
-        with open(self.spine_csv_file, "w", newline="") as f:
-            pass
-
-    def onKeypressedEvent(self, event):
-
-        key = event['key']
-        print("pressed")
-        # Existing cable control logic
-        if key in self.pull_keys:
-            idx = self.pull_keys[key]
-            self._adjust_cable(idx, self.displacement_step)
-        elif key in self.release_keys:
-            idx = self.release_keys[key]
-            self._adjust_cable(idx, -self.displacement_step)
-            if key == "!" and self.cables[0].CableConstraint.value[0] <= 0:
-                # self._adjust_cable(0, -self.displacement_step)
-                self._adjust_cable(1, self.displacement_step)
-                self._adjust_cable(2, self.displacement_step)
-                
-        elif key == "4":
-            for idx in range(3):
-                self._adjust_cable(idx, self.displacement_step)
-        elif key == "$":
-            for idx in range(3):
-                self._adjust_cable(idx, -self.displacement_step)
-        elif key == "0":
-            self.optimize_theta(displacement=15.0)
-
-
-        # Call the new function for ROI extraction and CSV logging
-        # if key != "4" and key != "$":
-        log_roi_csv(self.csv_file,
-                    self.cables,
-                    self.roi_nodes,
-                    self.soft_body_node,
-                    printInTerminal=0
-                    )
-        spine_log_roi_csv(
-            self.cables,
-            self.roi_nodes,
-            self.soft_body_node,
-            self.roi_box_centers,
-            self.spine_csv_file,
-            printInTerminal=0
-        )
-
-
-        # if not self.enable_theta_optimization_cables:
-            
-        # Existing status display
-        disp_values = [c.CableConstraint.value[0] for c in self.cables]
-        print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
-        force_values = [c.CableConstraint.force.value for c in self.cables]
-        print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
-
-    def _adjust_cable(self, idx, delta):
-        current_disp = self.cables[idx].CableConstraint.value[0]
-        new_disp = max(0, current_disp + delta)
-        self.cables[idx].CableConstraint.value = [new_disp]
-
-    def generate_cable_paths(self, theta0):
-        center = (17.5, 0, 17.5)
-        radius = 10
-        y_values = [i * 10 for i in range(12)]
-        thetas = [theta0, theta0 + 2*np.pi/3, theta0 + 4*np.pi/3]
-        paths = []
-        pull_points = []
-        for t in thetas:
-            x = center[0] + radius * np.cos(t)
-            z = center[2] + radius * np.sin(t)
-            path = [[x, y, z] for y in y_values]
-            paths.append(path)
-            pull_points.append([x, -3, z])
-        return paths, pull_points
-
-    def optimize_theta(self, displacement=20.0, settle_steps=20, max_disp=20.0):
-        if not self.enable_theta_optimization_cables:
-            print("Theta optimization is disabled.")
-            return
-        reset_theta_optim_summary()
-        cables_per_triplet = 3
-        best_theta = None
-        best_rms_diff = float('inf')
-        best_indices = None
-        best_forces = None
-
-        print("\nStarting cable angle optimization...")
-
-        thetas = list(range(0, 360, self.resolution_deg))
-        if thetas[-1] != 360:
-            thetas.append(360)
-        for i, theta in enumerate(thetas):
-            start = i * 3
-            triplet_indices = [start + j for j in range(3)]
-            if max(triplet_indices) >= len(self.cables):
-                print(f"Skipping theta={theta}° due to insufficient cables for triplet_indices {triplet_indices}")
-                continue
-            # Release all cables
-            for c in self.cables:
-                c.CableConstraint.value = [0]
-            for _ in range(settle_steps):
-                Sofa.Simulation.animate(self.root, 0.01)
-
-            # Contract: Pull only this triplet
-            disp = min(displacement, max_disp)
-            for idx in triplet_indices:
-                self.cables[idx].CableConstraint.value = [disp]
-            for _ in range(settle_steps):
-                Sofa.Simulation.animate(self.root, 0.01)
-
-            force_values = [self.cables[idx].CableConstraint.force.value for idx in triplet_indices]
-            mean_force = sum(force_values) / 3
-            rms_diff = np.sqrt(sum((f - mean_force) ** 2 for f in force_values) / 3)
-
-            # Log every value
-            log_theta_optim_summary(theta, rms_diff, triplet_indices, force_values)
-            triplet_thetas = [(theta + k * 120) % 360 for k in range(3)]
-            print(f"thetas: {', '.join(f'{t:.1f}°' for t in triplet_thetas)}, Indices: {triplet_indices}, Forces: {force_values}, RMS_diff: {rms_diff:.6f}")
-
-            if rms_diff < best_rms_diff:
-                best_rms_diff = rms_diff
-                best_theta = theta
-                best_indices = triplet_indices.copy()
-                best_forces = force_values.copy()
-
-            # Release this triplet
-            for idx in triplet_indices:
-                self.cables[idx].CableConstraint.value = [0]
-            for _ in range(settle_steps):
-                Sofa.Simulation.animate(self.root, 0.01)
-
-        print(f"\nBest theta: {best_theta:.1f}°, Min RMS_diff: {best_rms_diff:.6f}")
-   
-    @staticmethod
-    def rotate_cable_points(points, deg, center=(17.5, 0, 17.5)):
+def rotate_cable_points(points, deg, center=(17.5, 0, 17.5)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
            return [list(pt) for pt in points]
@@ -362,16 +183,85 @@ class TDCRController(Sofa.Core.Controller):
        return rotated
 
 
+class TDCRController(Sofa.Core.Controller):
+    def __init__(self,
+                 cable_nodes,
+                 roi_nodes,
+                 soft_body_node,
+                 csv_file,
+                 root= None,
+                 initial_theta_deg=0.0,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = "TDCRController"
+        # self.displacement_step = 0.1
+        self.displacement_step = 0.5
+        self.pull_keys = {"1": 0, "2": 1, "3": 2}
+        self.release_keys = {"!": 0, "@": 1, "#": 2}
+        self.cables = cable_nodes
+        self.roi_nodes = roi_nodes
+        self.soft_body_node = soft_body_node
+        self.csv_file = csv_file
+        self.root = root
+        self.initial_theta_deg = initial_theta_deg
+        self.listening = True
 
+
+        # Clean the CSV file at every restart
+        os.makedirs(os.path.dirname(self.csv_file), exist_ok=True)
+        with open(self.csv_file, "w", newline="") as f:
+            pass
+
+    def onKeypressedEvent(self, event):
+
+        key = event['key']
+        print("pressed")
+        # Existing cable control logic
+        if key in self.pull_keys:
+            idx = self.pull_keys[key]
+            self._adjust_cable(idx, self.displacement_step)
+        elif key in self.release_keys:
+            idx = self.release_keys[key]
+            self._adjust_cable(idx, -self.displacement_step)
+            # if key == "!" and self.cables[0].CableConstraint.value[0] <= 0:
+            #     # self._adjust_cable(0, -self.displacement_step)
+            #     self._adjust_cable(1, self.displacement_step)
+            #     self._adjust_cable(2, self.displacement_step)
+                
+        elif key == "4":
+            for idx in range(3):
+                self._adjust_cable(idx, self.displacement_step)
+        elif key == "$":
+            for idx in range(3):
+                self._adjust_cable(idx, -self.displacement_step)
+
+
+        # if key != "4" and key != "$":
+        log_roi_csv(self.csv_file,
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    printInTerminal=0
+                    )
+
+        # Existing status display
+        disp_values = [c.CableConstraint.value[0] for c in self.cables]
+        print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+        force_values = [c.CableConstraint.force.value for c in self.cables]
+        print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+
+    def _adjust_cable(self, idx, delta):
+        current_disp = self.cables[idx].CableConstraint.value[0]
+        new_disp = max(0, current_disp + delta)
+        self.cables[idx].CableConstraint.value = [new_disp]
+
+  
 def TDCR(parentNode, name="TDCR",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
          fixingBox=[36, -1, -1, -1, 6, 36], minForce = -sys.float_info.max, maxForce = sys.float_info.max,
-         enable_theta_optimization_cables=True,
-         initial_theta_deg=0.0,resolution_deg=5):
+         initial_theta_deg=0.0):
     #############################################################################################################
-    if 360 % resolution_deg != 0:
-        raise ValueError(f"resolution_deg={resolution_deg} is not a divisor of 360. Please provide a value that divides 360 exactly (e.g., 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 72, 90, 120, 180, 360).")
-
+   
     # adding soft body
     tdcr = parentNode.addChild(name)
     #############################################################################################################
@@ -389,18 +279,6 @@ def TDCR(parentNode, name="TDCR",
         withConstraint=False
     )
     tdcr.addChild(soft_body)
-    #############################################################################################################
-    # rigidBody = RigidObject(tdcr,
-    #     surfaceMeshFileName="sphere.stl",
-    #     translation=[0, 0, 0],
-    #     rotation=[0, 0, 0],
-    #     uniformScale=1.0,
-    #     color=[0.8, 0.2, 0.2],
-    #     isAStaticObject=False
-    # )
-    # tdcr.addChild(rigidBody)
-
-    #############################################################################################################
 
     soft_body.addObject('LinearSolverConstraintCorrection')
     # Fix the base
@@ -408,16 +286,24 @@ def TDCR(parentNode, name="TDCR",
     #############################################################################################################
     # --- Define your ROI centers, epsilons, and forces here ---
     c1=loadPointListFromFile("cable1.json")
-    c2=loadPointListFromFile("cable2.json")
-    c3=loadPointListFromFile("cable3.json")
-    # all_points = [c1[-1], c2[-1], c3[-1]]
+    c2 = rotate_cable_points(c1,120)
+    c3 = rotate_cable_points(c1,240)
+    cables = []
+    cable_points_list = [c1, c2, c3]
+    for i, cable_points in enumerate(cable_points_list, start=1):
+        cable = PullingCable(
+            soft_body,
+            f"PullingCable_{i}",
+            pullPointLocation=cable_points[0],
+            rotation=rotation,
+            translation=translation,
+            cableGeometry=cable_points
+        )
+        cables.append(cable)
+
+
     all_points = c1 + c2 + c3
-    # coords = [c1,c2,c3]   #points
-    coords = [
-        (17.5, 110, 7.5),    # ROI 1 center
-        (8.839, 110, 22.5),  # ROI 2 center
-        (26.16, 110, 22.5)   # ROI 3 center
-    ]  # ROI centers
+    
     e=3
     epsilons = [e] * len(all_points)                            # epsilons
     forces = [[0,0,0], [0,0,0], [0,0,0]]           # forces, one per ROI
@@ -432,74 +318,25 @@ def TDCR(parentNode, name="TDCR",
     # Instantiating the TDCRController
 
 
-    output_dir = "/home/ci/my_files/TDCR/CSV_Plots"
+    output_dir = "/home/ci/my_files/TDCR_collision_test/CSV_Plots"
     csv_file = os.path.join(output_dir, "tdcr_output.csv")
 
-    roi_box_centers = all_points  # or whatever list you used for ROI centers
-    spine_csv_file = os.path.join(output_dir, "tdcr_spine.csv")
 
-    cables = []
-    if enable_theta_optimization_cables:
-        # --- Generate all triplets around the robot using rotation ---
-          # or another divisor of 360
-        thetas = list(range(0, 360, resolution_deg))
-        if thetas[-1] != 360:
-            thetas.append(360)
-        n_triplets = len(thetas)
-        center = (17.5, 0, 17.5)
-        cable_points = [c1, c2, c3]
-        all_cables = []
-        for step, theta0 in enumerate(thetas):
-            for i in range(3):
-                rotated_cable = TDCRController.rotate_cable_points(cable_points[i], theta0, center=center)
-                pull_point = [rotated_cable[0][0], -3, rotated_cable[0][2]]
-                cable = PullingCable(
-                    soft_body,
-                    f"PullingCable_triplet{step}_cable{i+1}",
-                    pullPointLocation=pull_point,
-                    rotation=rotation,
-                    translation=translation,
-                    cableGeometry=rotated_cable
-                )
-                cable.CableConstraint.minForce = minForce
-                cable.CableConstraint.maxForce = maxForce
-                all_cables.append(cable)
-        cables = all_cables
-
-    else:
-        # Always use rotate_cable_points, even if initial_theta_deg == 0
-        cable_points = [c1, c2, c3]
-        cable_names = ["PullingCable_1", "PullingCable_2", "PullingCable_3"]
-        cables = []
-        for i in range(3):
-            rotated_cable = TDCRController.rotate_cable_points(cable_points[i], initial_theta_deg)
-            pull_point = [rotated_cable[0][0], -3, rotated_cable[0][2]]
-            cable = PullingCable(
-                soft_body,
-                cable_names[i],
-                pullPointLocation=pull_point,
-                rotation=rotation,
-                translation=translation,
-                cableGeometry=rotated_cable
-            )
-            cable.CableConstraint.minForce = minForce
-            cable.CableConstraint.maxForce = maxForce
-            cables.append(cable)
-        soft_body.addChild(cable)
-        n_triplets = 1
-
+    # def __init__(self,
+    #              cable_nodes,
+    #              roi_nodes,
+    #              soft_body_node,
+    #              csv_file,
+    #              root= None,
+    #              initial_theta_deg=0.0,
+    #              *args, **kwargs):
 
     controller = TDCRController(
         cable_nodes=cables,
         roi_nodes=roi_nodes,
         soft_body_node=soft_body,
         csv_file=csv_file,
-        roi_box_centers=roi_box_centers,
-        spine_csv_file=spine_csv_file,
         root=parentNode,
-        n_triplets=n_triplets,
-        resolution_deg=resolution_deg,
-        enable_theta_optimization_cables=enable_theta_optimization_cables,
         initial_theta_deg=initial_theta_deg
     )
 
@@ -562,8 +399,7 @@ def createScene(rootNode):
     rootNode.bbox = "-50 -50 -50 50 50 50"
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
     TDCR(rootNode,
-         enable_theta_optimization_cables=False,
-         initial_theta_deg=0.0, resolution_deg=3,
+         initial_theta_deg=0.0,
          minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
     # add_rigid_object_from_stl(
