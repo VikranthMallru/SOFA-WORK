@@ -396,10 +396,10 @@ class TDCRController(Sofa.Core.Controller):
 
         if key == "0":
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
-            DeltaLv = 10.0
-            alpha_deg = 30.0
-            steps = 20
-            interval = 0.2
+            DeltaLv = 15.0
+            alpha_deg = 90.0
+            steps = 100
+            interval = 0.1
             step_size = DeltaLv / steps
             self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
 
@@ -427,6 +427,20 @@ class TDCRController(Sofa.Core.Controller):
                 self.cables[1].CableConstraint.value = [L2]
                 self.cables[2].CableConstraint.value = [L3]
                 print(f"Step {i+1}/{steps}: L1={L1:.3f}, L2={L2:.3f}, L3={L3:.3f}")
+                log_roi_csv(self.csv_file,
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    printInTerminal=0
+                    )
+                spine_log_roi_csv(
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    self.roi_box_centers,
+                    self.spine_csv_file,
+                    printInTerminal=0
+                    )
                 time.sleep(interval)
             print("Virtual tendon motion finished.")
         threading.Thread(target=step_loop, daemon=True).start()
