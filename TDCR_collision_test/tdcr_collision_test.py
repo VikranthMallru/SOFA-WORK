@@ -285,7 +285,7 @@ def TDCR(parentNode, name="TDCR",
     FixedBox(soft_body, atPositions=fixingBox, doVisualization=True)
     #############################################################################################################
     # --- Define your ROI centers, epsilons, and forces here ---
-    c1=loadPointListFromFile("cable1.json")
+    c1=rotate_cable_points(loadPointListFromFile("cable1.json"),initial_theta_deg)
     c2 = rotate_cable_points(c1,120)
     c3 = rotate_cable_points(c1,240)
     cables = []
