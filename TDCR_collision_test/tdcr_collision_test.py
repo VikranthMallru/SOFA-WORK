@@ -15,8 +15,24 @@ import os
 import csv
 from collections import defaultdict
 import numpy as np
+import threading
+import time
 
+import math
 
+def virtual_tendon_lengths(DeltaLv, alpha_deg):
+    """
+    Calculate cable length changes for a virtual tendon.
+    Args:
+        DeltaLv: Scalar displacement (float)
+        alpha_deg: Angle in degrees (float)
+    Returns:
+        (L1, L2, L3): Tuple of floats
+    """
+    L1 = DeltaLv * math.cos(math.radians(alpha_deg))
+    L2 = DeltaLv * math.cos(math.radians(120 - alpha_deg))
+    L3 = DeltaLv * math.cos(math.radians(240 - alpha_deg))
+    return L1, L2, L3
 
 def make_roi_boxes(coords, epsilons):
     """Create box definitions for each point and epsilon."""
@@ -296,6 +312,42 @@ class TDCRController(Sofa.Core.Controller):
             pass
 
 
+    def auto_pull_cable(self, cable, displacement_step, interval, max_disp):
+        """
+        Pulls the given cable by displacement_step every interval seconds,
+        until total displacement increases by max_disp.
+        """
+        def pull_loop():
+            start_disp = cable.CableConstraint.value[0]
+            while cable.CableConstraint.value[0] - start_disp < max_disp:
+                new_disp = cable.CableConstraint.value[0] + displacement_step
+                cable.CableConstraint.value = [new_disp]
+                print(f"Auto-pull: cable displacement = {new_disp:.2f}")
+                log_roi_csv(self.csv_file,
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    printInTerminal=0
+                    )
+                spine_log_roi_csv(
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    self.roi_box_centers,
+                    self.spine_csv_file,
+                    printInTerminal=0
+                    )
+                disp_values = [c.CableConstraint.value[0] for c in self.cables]
+                print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+                force_values = [c.CableConstraint.force.value for c in self.cables]
+                print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+                time.sleep(interval)
+            print("Auto-pull finished.")
+            
+
+        thread = threading.Thread(target=pull_loop, daemon=True)
+        thread.start()
+
     def onKeypressedEvent(self, event):
 
         key = event['key']
@@ -342,11 +394,42 @@ class TDCRController(Sofa.Core.Controller):
         force_values = [c.CableConstraint.force.value for c in self.cables]
         print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
 
+        if key == "0":
+            # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
+            DeltaLv = 10.0
+            alpha_deg = 30.0
+            steps = 20
+            interval = 0.2
+            step_size = DeltaLv / steps
+            self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
+
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
         new_disp = max(0, current_disp + delta)
         self.cables[idx].CableConstraint.value = [new_disp]
 
+    def virtual_tendon_stepper(self, DeltaLv, alpha_deg, step_size, interval, steps):
+        """
+        Moves cables in virtual tendon direction in steps.
+        Args:
+            DeltaLv: Total virtual tendon displacement
+            alpha_deg: Direction angle in degrees
+            step_size: Scalar step size per interval
+            interval: Time between steps (seconds)
+            steps: Number of steps
+        """
+        def step_loop():
+            for i in range(steps):
+                frac = (i + 1) / steps
+                L1, L2, L3 = virtual_tendon_lengths(DeltaLv * frac, alpha_deg)
+                # Set cable lengths relative to initial
+                self.cables[0].CableConstraint.value = [L1]
+                self.cables[1].CableConstraint.value = [L2]
+                self.cables[2].CableConstraint.value = [L3]
+                print(f"Step {i+1}/{steps}: L1={L1:.3f}, L2={L2:.3f}, L3={L3:.3f}")
+                time.sleep(interval)
+            print("Virtual tendon motion finished.")
+        threading.Thread(target=step_loop, daemon=True).start()
   
 def TDCR(parentNode, name="TDCR",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
@@ -509,13 +592,15 @@ def createScene(rootNode):
     # color=[1,1,1,1],
     # isStatic=True
     # )
+
+
     # add_rigid_object_from_stl(
-    # rootNode,  # or rootNode, or wherever you want it
+    # rootNode,  
     # name="RigidSphere",
     # stl_path="sphere.stl",
-    # translation=[15, 100, -15],
+    # translation=[9, 70, -15],
     # rotation=[0, 0, 0],
-    # scale=10.0,            # Adjust as needed for your mesh
+    # scale=10.0,           
     # total_mass=1.0,
     # volume=1.0,
     # color=[1,1,1,1],

@@ -94,7 +94,7 @@ check_ax.set_visible(True)
 
 
 for text in check.labels:
-    text.set_fontsize(16)  # Increase checkbox label font size
+   text.set_fontsize(12)  # Smaller font size
 
 legend_ax = plt.axes([0.8, 0.65, 0.15, 0.12])
 legend_ax.axis('off')
