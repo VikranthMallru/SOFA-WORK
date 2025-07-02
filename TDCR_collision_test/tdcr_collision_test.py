@@ -167,7 +167,7 @@ def add_rigid_object_from_stl(parent_node,
 
     return rigid
 
-def rotate_cable_points(points, deg, center=(17.5, 0, 17.5)):
+def rotate_cable_points(points, deg, center=(9,0,9)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
            return [list(pt) for pt in points]
@@ -182,6 +182,83 @@ def rotate_cable_points(points, deg, center=(17.5, 0, 17.5)):
            rotated.append([x1 + cx, y, z1 + cz])
        return rotated
 
+def spine_log_roi_csv(cables, roi_nodes, soft_body_node, roi_box_centers, spine_csv_file, y_tol=1e-5, printInTerminal=1):
+    """
+    Log cable, force, and 'spine' points (average of all points in ROI boxes with the same y center) to CSV.
+    Also print all points in each y-group and the group average if printInTerminal is set.
+    """
+    dofs = soft_body_node.getObject('dofs')
+    if dofs is None:
+        if printInTerminal:
+            print("MechanicalObject 'dofs' not found!")
+        return
+    positions = dofs.position.value
+
+    # --- Group ROI boxes by y value of their center coordinate ---
+    y_groups = defaultdict(list)  # key: y value, value: list of (roi_idx, roi_node)
+    for idx, center in enumerate(roi_box_centers):
+        y_val = center[1]
+        # Find if this y value matches any existing group (within tolerance)
+        found = False
+        for y_key in y_groups:
+            if abs(y_val - y_key) < y_tol:
+                y_groups[y_key].append(idx)
+                found = True
+                break
+        if not found:
+            y_groups[y_val].append(idx)
+
+    # --- For each y-group, collect all points from all ROI boxes in that group ---
+    group_points = []
+    for y_key in sorted(y_groups.keys()):
+        indices_in_group = y_groups[y_key]
+        points = []
+        if printInTerminal:
+            print(f"\nY-group (y={y_key:.3f}), ROI boxes: {indices_in_group}")
+        for idx in indices_in_group:
+            roi = roi_nodes[idx]
+            boxroi = roi.getObject(f"roi_{idx+1}")
+            indices = boxroi.indices.value
+            roi_coords = [positions[i] for i in indices]
+            for pt_idx, (x, y, z) in enumerate(roi_coords):
+                if printInTerminal:
+                    print(f"  ROI {idx+1} Point {pt_idx+1}: ({x:.3f}, {y:.3f}, {z:.3f})")
+            points.extend(roi_coords)
+        # Print and compute average for this y-group
+        if points:
+            avg_x = sum(pt[0] for pt in points) / len(points)
+            avg_y = sum(pt[1] for pt in points) / len(points)
+            avg_z = sum(pt[2] for pt in points) / len(points)
+            if printInTerminal:
+                print(f"  Group Average: ({avg_x:.3f}, {avg_y:.3f}, {avg_z:.3f})")
+            group_points.append((avg_x, avg_y, avg_z))
+        else:
+            if printInTerminal:
+                print("  Group Average: (N/A, N/A, N/A)")
+            group_points.append(("", "", ""))
+
+    # --- Prepare CSV row ---
+    disp_values = [c.CableConstraint.value[0] for c in cables]
+    force_values = [c.CableConstraint.force.value for c in cables]
+    row = [f"{d:.3f}" for d in disp_values] + [f"{f:.3f}" for f in force_values]
+    for pt in group_points:
+        row += [f"{pt[0]:.3f}" if pt[0] != "" else "",
+                f"{pt[1]:.3f}" if pt[1] != "" else "",
+                f"{pt[2]:.3f}" if pt[2] != "" else ""]
+
+    # --- Write header if needed ---
+    file_exists = os.path.isfile(spine_csv_file)
+    if (not file_exists or os.stat(spine_csv_file).st_size == 0) and len(group_points) > 0:
+        header = ["L1", "L2", "L3", "F1", "F2", "F3"]
+        for i in range(1, len(group_points)+1):
+            header += [f"x{i}", f"y{i}", f"z{i}"]
+        with open(spine_csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+    # --- Append row ---
+    with open(spine_csv_file, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
 
 class TDCRController(Sofa.Core.Controller):
     def __init__(self,
@@ -189,13 +266,15 @@ class TDCRController(Sofa.Core.Controller):
                  roi_nodes,
                  soft_body_node,
                  csv_file,
+                 spine_csv_file=None,
                  root= None,
                  initial_theta_deg=0.0,
+                 roi_box_centers=None,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "TDCRController"
-        # self.displacement_step = 0.1
-        self.displacement_step = 0.5
+        self.displacement_step = 0.1
+        # self.displacement_step = 0.5
         self.pull_keys = {"1": 0, "2": 1, "3": 2}
         self.release_keys = {"!": 0, "@": 1, "#": 2}
         self.cables = cable_nodes
@@ -205,12 +284,17 @@ class TDCRController(Sofa.Core.Controller):
         self.root = root
         self.initial_theta_deg = initial_theta_deg
         self.listening = True
-
+        self.roi_box_centers = roi_box_centers
+        self.spine_csv_file = spine_csv_file
 
         # Clean the CSV file at every restart
         os.makedirs(os.path.dirname(self.csv_file), exist_ok=True)
         with open(self.csv_file, "w", newline="") as f:
             pass
+        os.makedirs(os.path.dirname(self.spine_csv_file), exist_ok=True)
+        with open(self.spine_csv_file, "w", newline="") as f:
+            pass
+
 
     def onKeypressedEvent(self, event):
 
@@ -243,6 +327,14 @@ class TDCRController(Sofa.Core.Controller):
                     self.soft_body_node,
                     printInTerminal=0
                     )
+        spine_log_roi_csv(
+            self.cables,
+            self.roi_nodes,
+            self.soft_body_node,
+            self.roi_box_centers,
+            self.spine_csv_file,
+            printInTerminal=0
+        )
 
         # Existing status display
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
@@ -258,7 +350,7 @@ class TDCRController(Sofa.Core.Controller):
   
 def TDCR(parentNode, name="TDCR",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
-         fixingBox=[36, -1, -1, -1, 6, 36], minForce = -sys.float_info.max, maxForce = sys.float_info.max,
+         fixingBox=[-1,-1,-1,19,3,19], minForce = -sys.float_info.max, maxForce = sys.float_info.max,
          initial_theta_deg=0.0):
     #############################################################################################################
    
@@ -320,6 +412,7 @@ def TDCR(parentNode, name="TDCR",
 
     output_dir = "/home/ci/my_files/TDCR_collision_test/CSV_Plots"
     csv_file = os.path.join(output_dir, "tdcr_output.csv")
+    spine_file = os.path.join(output_dir, "tdcr_spine_output.csv")
 
 
     # def __init__(self,
@@ -336,8 +429,10 @@ def TDCR(parentNode, name="TDCR",
         roi_nodes=roi_nodes,
         soft_body_node=soft_body,
         csv_file=csv_file,
+        spine_csv_file=spine_file,
         root=parentNode,
-        initial_theta_deg=initial_theta_deg
+        initial_theta_deg=initial_theta_deg,
+        roi_box_centers=all_points
     )
 
 

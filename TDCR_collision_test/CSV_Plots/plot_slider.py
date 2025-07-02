@@ -4,8 +4,8 @@ from matplotlib.widgets import Slider
 import numpy as np
 
 # Load your CSV file
-df = pd.read_csv('tdcr_output.csv')
-# df = pd.read_csv('tdcr_spine.csv')
+# df = pd.read_csv('tdcr_output.csv')
+df = pd.read_csv('tdcr_spine_output.csv')
 # Identify all x, y, z columns
 x_cols = [col for col in df.columns if col.startswith('x')]
 y_cols = [col for col in df.columns if col.startswith('y')]
