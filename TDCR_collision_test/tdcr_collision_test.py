@@ -182,7 +182,42 @@ def add_rigid_object_from_stl(parent_node,
     visu.addObject('RigidMapping')
 
     return rigid
-
+def add_soft_object_from_stl(
+    parent_node,
+    name="softObject",
+    volume_mesh="tdcr_volume.vtk",
+    surface_mesh="tdcr_surface.stl",
+    collision_mesh="tdcr_collision.stl",
+    translation=[0.0, 0.0, 0.0],
+    rotation=[0.0, 0.0, 0.0],
+    young_modulus=60000,
+    poisson_ratio=0.25,
+    total_mass=0.03,
+    surface_color=[0.96, 0.87, 0.70, 1.0],
+    with_constraint=False,
+    fixing_box=None
+):
+    """
+    Adds a deformable soft object from mesh files to the parent_node.
+    Optionally applies a FixedBox constraint if fixing_box is provided.
+    """
+    soft_body = ElasticMaterialObject(
+        parent_node,
+        volumeMeshFileName=volume_mesh,
+        surfaceMeshFileName=surface_mesh,
+        collisionMesh=collision_mesh,
+        youngModulus=young_modulus,
+        poissonRatio=poisson_ratio,
+        totalMass=total_mass,
+        surfaceColor=surface_color,
+        rotation=rotation,
+        translation=translation,
+        withConstraint=with_constraint
+    )
+    soft_body.addObject('LinearSolverConstraintCorrection')
+    if fixing_box is not None:
+        FixedBox(soft_body, atPositions=fixing_box, doVisualization=True)
+    return soft_body
 def rotate_cable_points(points, deg, center=(9,0,9)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -445,33 +480,33 @@ class TDCRController(Sofa.Core.Controller):
             print("Virtual tendon motion finished.")
         threading.Thread(target=step_loop, daemon=True).start()
   
+
+
 def TDCR(parentNode, name="TDCR",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
          fixingBox=[-1,-1,-1,19,3,19], minForce = -sys.float_info.max, maxForce = sys.float_info.max,
          initial_theta_deg=0.0):
     #############################################################################################################
-   
-    # adding soft body
     tdcr = parentNode.addChild(name)
     #############################################################################################################
 
-    soft_body = ElasticMaterialObject(tdcr,
-        volumeMeshFileName="tdcr_volume.vtk",
-        surfaceMeshFileName="tdcr_surface.stl",
-        collisionMesh="tdcr_collision.stl",
-        youngModulus=60000,
-        poissonRatio=0.25,
-        totalMass=0.03,
-        surfaceColor=[0.96, 0.87, 0.70, 1.0],
-        rotation=rotation,
+    # Use the new soft object function
+    soft_body = add_soft_object_from_stl(
+        tdcr,
+        name="SoftBody",
+        volume_mesh="tdcr_volume.vtk",
+        surface_mesh="tdcr_surface.stl",
+        collision_mesh="tdcr_collision.stl",
         translation=translation,
-        withConstraint=False
+        rotation=rotation,
+        young_modulus=60000,
+        poisson_ratio=0.25,
+        total_mass=0.03,
+        surface_color=[0.96, 0.87, 0.70, 1.0],
+        with_constraint=False,
+        fixing_box=fixingBox
     )
-    tdcr.addChild(soft_body)
 
-    soft_body.addObject('LinearSolverConstraintCorrection')
-    # Fix the base
-    FixedBox(soft_body, atPositions=fixingBox, doVisualization=True)
     #############################################################################################################
     # --- Define your ROI centers, epsilons, and forces here ---
     c1=rotate_cable_points(loadPointListFromFile("cable1.json"),initial_theta_deg)
@@ -490,9 +525,8 @@ def TDCR(parentNode, name="TDCR",
         )
         cables.append(cable)
 
-
     all_points = c1 + c2 + c3
-    
+
     e=3
     epsilons = [e] * len(all_points)                            # epsilons
     forces = [[0,0,0], [0,0,0], [0,0,0]]           # forces, one per ROI
@@ -502,24 +536,12 @@ def TDCR(parentNode, name="TDCR",
     add_monitors_to_rois(roi_nodes)
     # add_forcefields_to_rois(roi_nodes, forces)
 
-
     #############################################################################################################
     # Instantiating the TDCRController
-
 
     output_dir = "/home/ci/my_files/TDCR_collision_test/CSV_Plots"
     csv_file = os.path.join(output_dir, "tdcr_output.csv")
     spine_file = os.path.join(output_dir, "tdcr_spine_output.csv")
-
-
-    # def __init__(self,
-    #              cable_nodes,
-    #              roi_nodes,
-    #              soft_body_node,
-    #              csv_file,
-    #              root= None,
-    #              initial_theta_deg=0.0,
-    #              *args, **kwargs):
 
     controller = TDCRController(
         cable_nodes=cables,
@@ -532,13 +554,11 @@ def TDCR(parentNode, name="TDCR",
         roi_box_centers=all_points
     )
 
-
     soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True 
     soft_body.collisionmodel.LineCollisionModel.selfCollision = True
     soft_body.collisionmodel.PointCollisionModel.selfCollision = True
 
     soft_body.addObject(controller)
-
 
     tdcr.addObject('EulerImplicitSolver', rayleighStiffness=0.1, rayleighMass=0.1)
     #############################################################################################################
@@ -594,34 +614,38 @@ def createScene(rootNode):
          initial_theta_deg=0.0,
          minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
+    # --- Rigid sphere commented out ---
+    # position = rotate_cable_points([[9, 40, -13]], 90.0)
     # add_rigid_object_from_stl(
-    # rootNode,  # or rootNode, or wherever you want it
-    # name="RigidCube",
-    # stl_path="cube.stl",
-    # translation=[15, 100, -15],
-    # rotation=[0, 0, 0],
-    # scale=10.0,            # Adjust as needed for your mesh
-    # total_mass=1.0,
-    # volume=1.0,
-    # color=[1,1,1,1],
-    # isStatic=True
+    #     rootNode,  
+    #     name="RigidSphere",
+    #     stl_path="sphere.stl",
+    #     translation=position,
+    #     rotation=[0, 0, 0],
+    #     scale=20.0,           
+    #     total_mass=1.0,
+    #     volume=1.0,
+    #     color=[1,1,1,1],
+    #     isStatic=False
     # )
 
-    position = rotate_cable_points([[9, 40, -13]], 90.0)
-    
-    add_rigid_object_from_stl(
-    rootNode,  
-    name="RigidSphere",
-    stl_path="sphere.stl",
-    translation=position,
-    rotation=[0, 0, 0],
-    scale=20.0,           
-    total_mass=1.0,
-    volume=1.0,
-    color=[1,1,1,1],
-    isStatic=False
+    # --- Add soft sphere instead ---
+    position = rotate_cable_points([[9, 40, -13]], 90.0)[0]
+    add_soft_object_from_stl(
+        rootNode,
+        name="SoftSphere",
+        volume_mesh="sphere_volume.vtk",
+        surface_mesh="sphere.stl",
+        collision_mesh="sphere.stl",
+        translation=position,
+        rotation=[0, 0, 0],
+        young_modulus=60000,
+        poisson_ratio=0.25,
+        total_mass=0.03,
+        surface_color=[1, 1, 1, 1],
+        with_constraint=False,
+        fixing_box=None  # Set a box if you want to fix part of the sphere
     )
-    
 
     return rootNode
 

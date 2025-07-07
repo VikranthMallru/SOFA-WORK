@@ -286,6 +286,37 @@ def add_rigid_object_from_stl(parent_node,
 
     return rigid
 
+def add_soft_object_from_stl(parent_node,
+                             name="SoftObject",
+                             volume_mesh="tdcr_volume.vtk",
+                             surface_mesh="tdcr_surface.stl",
+                             collision_mesh="tdcr_collision.stl",
+                             young_modulus=60000,
+                             poisson_ratio=0.25,
+                             total_mass=0.03,
+                             surface_color=[0.96, 0.87, 0.70, 1.0],
+                             rotation=[0.0, 0.0, 0.0],
+                             translation=[0.0, 0.0, 0.0],
+                             with_constraint=False):
+    """
+    Adds a soft object from STL/VTK meshes to the parent_node using ElasticMaterialObject.
+    """
+    soft_obj = ElasticMaterialObject(
+        parent_node,
+        volumeMeshFileName=volume_mesh,
+        surfaceMeshFileName=surface_mesh,
+        collisionMesh=collision_mesh,
+        youngModulus=young_modulus,
+        poissonRatio=poisson_ratio,
+        totalMass=total_mass,
+        surfaceColor=surface_color,
+        rotation=rotation,
+        translation=translation,
+        withConstraint=with_constraint
+    )
+    parent_node.addChild(soft_obj)
+    return soft_obj
+
 
 
 
@@ -492,19 +523,20 @@ def TDCR(parentNode, name="TDCR",
     tdcr = parentNode.addChild(name)
     #############################################################################################################
 
-    soft_body = ElasticMaterialObject(tdcr,
-        volumeMeshFileName="tdcr_volume.vtk",
-        surfaceMeshFileName="tdcr_surface.stl",
-        collisionMesh="tdcr_collision.stl",
-        youngModulus=60000,
-        poissonRatio=0.25,
-        totalMass=0.03,
-        surfaceColor=[0.96, 0.87, 0.70, 1.0],
+    soft_body = add_soft_object_from_stl(
+        tdcr,
+        name="SoftObject",
+        volume_mesh="tdcr_volume.vtk",
+        surface_mesh="tdcr_surface.stl",
+        collision_mesh="tdcr_collision.stl",
+        young_modulus=60000,
+        poisson_ratio=0.25,
+        total_mass=0.03,
+        surface_color=[0.96, 0.87, 0.70, 1.0],
         rotation=rotation,
         translation=translation,
-        withConstraint=False
+        with_constraint=False
     )
-    tdcr.addChild(soft_body)
     #############################################################################################################
     # rigidBody = RigidObject(tdcr,
     #     surfaceMeshFileName="sphere.stl",
@@ -706,6 +738,7 @@ def createScene(rootNode):
     # color=[1,1,1,1],
     # isStatic=True
     # )
+
     
 
     return rootNode
