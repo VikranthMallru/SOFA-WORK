@@ -182,26 +182,25 @@ def add_rigid_object_from_stl(parent_node,
     visu.addObject('RigidMapping')
 
     return rigid
-def add_soft_object_from_stl(
-    parent_node,
-    name="softObject",
-    volume_mesh="tdcr_volume.vtk",
-    surface_mesh="tdcr_surface.stl",
-    collision_mesh="tdcr_collision.stl",
-    translation=[0.0, 0.0, 0.0],
-    rotation=[0.0, 0.0, 0.0],
-    young_modulus=60000,
-    poisson_ratio=0.25,
-    total_mass=0.03,
-    surface_color=[0.96, 0.87, 0.70, 1.0],
-    with_constraint=False,
-    fixing_box=None
-):
+
+def add_soft_object_from_stl(parent_node,
+                             name="SoftObject",
+                             volume_mesh="tdcr_volume.vtk",
+                             surface_mesh="tdcr_surface.stl",
+                             collision_mesh="tdcr_collision.stl",
+                             young_modulus=60000,
+                             poisson_ratio=0.25,
+                             total_mass=0.03,
+                             surface_color=[0.96, 0.87, 0.70, 1.0],
+                             rotation=[0.0, 0.0, 0.0],
+                             translation=[0.0, 0.0, 0.0],
+                             with_constraint=False,
+                             fixing_box=None,
+                             scale=[1, 1, 1]):
     """
-    Adds a deformable soft object from mesh files to the parent_node.
-    Optionally applies a FixedBox constraint if fixing_box is provided.
+    Adds a soft object from STL/VTK meshes to the parent_node using ElasticMaterialObject.
     """
-    soft_body = ElasticMaterialObject(
+    soft_obj = ElasticMaterialObject(
         parent_node,
         volumeMeshFileName=volume_mesh,
         surfaceMeshFileName=surface_mesh,
@@ -212,12 +211,15 @@ def add_soft_object_from_stl(
         surfaceColor=surface_color,
         rotation=rotation,
         translation=translation,
-        withConstraint=with_constraint
+        withConstraint=with_constraint,
+        scale = scale
     )
-    soft_body.addObject('LinearSolverConstraintCorrection')
+    parent_node.addChild(soft_obj)
+    # Add fixing box if provided
     if fixing_box is not None:
-        FixedBox(soft_body, atPositions=fixing_box, doVisualization=True)
-    return soft_body
+        FixedBox(soft_obj, atPositions=fixing_box, doVisualization=True)
+    return soft_obj
+
 def rotate_cable_points(points, deg, center=(9,0,9)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -431,9 +433,9 @@ class TDCRController(Sofa.Core.Controller):
 
         if key == "0":
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
-            DeltaLv = 15.0
+            DeltaLv = 7.0
             alpha_deg = 90.0
-            steps = 200
+            steps =(int) (50.0 * DeltaLv) 
             interval = 0.1
             step_size = DeltaLv / steps
             self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
@@ -504,8 +506,9 @@ def TDCR(parentNode, name="TDCR",
         total_mass=0.03,
         surface_color=[0.96, 0.87, 0.70, 1.0],
         with_constraint=False,
-        fixing_box=fixingBox
+        fixing_box=fixingBox  # Pass the fixing box to the soft object
     )
+    soft_body.addObject('LinearSolverConstraintCorrection')
 
     #############################################################################################################
     # --- Define your ROI centers, epsilons, and forces here ---
@@ -615,7 +618,7 @@ def createScene(rootNode):
          minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
     # --- Rigid sphere commented out ---
-    # position = rotate_cable_points([[9, 40, -13]], 90.0)
+    position = [40,75,9]
     # add_rigid_object_from_stl(
     #     rootNode,  
     #     name="RigidSphere",
@@ -626,26 +629,34 @@ def createScene(rootNode):
     #     total_mass=1.0,
     #     volume=1.0,
     #     color=[1,1,1,1],
-    #     isStatic=False
+    #     isStatic=True
     # )
 
     # --- Add soft sphere instead ---
-    position = rotate_cable_points([[9, 40, -13]], 90.0)[0]
-    add_soft_object_from_stl(
-        rootNode,
-        name="SoftSphere",
-        volume_mesh="sphere_volume.vtk",
-        surface_mesh="sphere.stl",
-        collision_mesh="sphere.stl",
-        translation=position,
-        rotation=[0, 0, 0],
-        young_modulus=60000,
-        poisson_ratio=0.25,
-        total_mass=0.03,
-        surface_color=[1, 1, 1, 1],
-        with_constraint=False,
-        fixing_box=None  # Set a box if you want to fix part of the sphere
-    )
+    position = [40,75,9]
+    s = 20
+    delta = 1  # Adjust delta as needed
+    delta2 = 10
+    x, y, z = position
+    x = x + s / 2  
+    fixing_box = [x - delta, y - delta2, z - delta2, x + delta, y + delta2, z + delta2]
+
+    # add_soft_object_from_stl(
+    #     rootNode,
+    #     name="SoftSphere",
+    #     volume_mesh="sphere_volume.vtk",
+    #     surface_mesh="sphere.stl",
+    #     collision_mesh="sphere.stl",
+    #     translation=position,
+    #     rotation=[0, 0, 0],
+    #     young_modulus=6_000,
+    #     poisson_ratio=0.25,
+    #     total_mass=0.03,
+    #     surface_color=[1, 1, 1, 1],
+    #     with_constraint=False,
+    #     fixing_box=fixing_box,  # Box from point-delta to point+delta
+    #     scale=[s, s, s]  # Adjust scale as needed
+    # )
 
     return rootNode
 
