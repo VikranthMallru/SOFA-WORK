@@ -15,8 +15,24 @@ import os
 import csv
 from collections import defaultdict
 import numpy as np
+import threading
+import time
 
+import math
 
+def virtual_tendon_lengths(DeltaLv, alpha_deg):
+    """
+    Calculate cable length changes for a virtual tendon.
+    Args:
+        DeltaLv: Scalar displacement (float)
+        alpha_deg: Angle in degrees (float)
+    Returns:
+        (L1, L2, L3): Tuple of floats
+    """
+    L1 = DeltaLv * math.cos(math.radians(alpha_deg))
+    L2 = DeltaLv * math.cos(math.radians(120 - alpha_deg))
+    L3 = DeltaLv * math.cos(math.radians(240 - alpha_deg))
+    return L1, L2, L3
 
 def make_roi_boxes(coords, epsilons):
     """Create box definitions for each point and epsilon."""
@@ -373,8 +389,8 @@ class TDCRController(Sofa.Core.Controller):
         elif key in self.release_keys:
             idx = self.release_keys[key]
             self._adjust_cable(idx, -self.displacement_step)
-            if key == "!" and self.cables[0].CableConstraint.value[0] <= 0:
-                # self._adjust_cable(0, -self.displacement_step)
+            if key == "!" or self.cables[0].CableConstraint.value[0] <= 0:
+                self._adjust_cable(0, -self.displacement_step)
                 self._adjust_cable(1, self.displacement_step)
                 self._adjust_cable(2, self.displacement_step)
                 
@@ -388,15 +404,16 @@ class TDCRController(Sofa.Core.Controller):
             self.optimize_theta(displacement=15.0)
 
 
+
         # Call the new function for ROI extraction and CSV logging
-        # if key != "4" and key != "$":
-        log_roi_csv(self.csv_file,
+        if key != "4" and key != "$":
+            log_roi_csv(self.csv_file,
                     self.cables,
                     self.roi_nodes,
                     self.soft_body_node,
                     printInTerminal=0
                     )
-        spine_log_roi_csv(
+            spine_log_roi_csv(
             self.cables,
             self.roi_nodes,
             self.soft_body_node,
@@ -404,8 +421,15 @@ class TDCRController(Sofa.Core.Controller):
             self.spine_csv_file,
             printInTerminal=0
         )
-
-
+        if key == "9":
+            # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
+            DeltaLv = 50.0
+            alpha_deg = 0.0
+            steps =(int) (1.0 * DeltaLv) 
+            interval = 0.5
+            step_size = DeltaLv / steps
+            self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
+        
         # if not self.enable_theta_optimization_cables:
             
         # Existing status display
@@ -507,7 +531,43 @@ class TDCRController(Sofa.Core.Controller):
            z1 = x0 * s + z0 * c
            rotated.append([x1 + cx, y, z1 + cz])
        return rotated
-
+    def virtual_tendon_stepper(self, DeltaLv, alpha_deg, step_size, interval, steps):
+        """
+        Moves cables in virtual tendon direction in steps.
+        Args:
+            DeltaLv: Total virtual tendon displacement
+            alpha_deg: Direction angle in degrees
+            step_size: Scalar step size per interval
+            interval: Time between steps (seconds)
+            steps: Number of steps
+        """
+        def step_loop():
+            for i in range(steps):
+                frac = (i + 1) / steps
+                L1, L2, L3 = virtual_tendon_lengths(DeltaLv * frac, alpha_deg)
+                # Set cable lengths relative to initial
+                self.cables[0].CableConstraint.value = [L1]
+                self.cables[1].CableConstraint.value = [L2]
+                self.cables[2].CableConstraint.value = [L3]
+                print(f"Step {i+1}/{steps}: L1={L1:.3f}, L2={L2:.3f}, L3={L3:.3f}")
+                log_roi_csv(self.csv_file,
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    printInTerminal=0
+                    )
+                spine_log_roi_csv(
+                    self.cables,
+                    self.roi_nodes,
+                    self.soft_body_node,
+                    self.roi_box_centers,
+                    self.spine_csv_file,
+                    printInTerminal=0
+                    )
+                time.sleep(interval)
+            print("Virtual tendon motion finished.")
+        threading.Thread(target=step_loop, daemon=True).start()
+ 
 
 
 def TDCR(parentNode, name="TDCR",
@@ -558,8 +618,8 @@ def TDCR(parentNode, name="TDCR",
     c1=loadPointListFromFile("cable1.json")
     c2=loadPointListFromFile("cable2.json")
     c3=loadPointListFromFile("cable3.json")
-    # all_points = [c1[-1], c2[-1], c3[-1]]
-    all_points = c1 + c2 + c3
+    all_points = [c1[-1], c2[-1], c3[-1]]
+    # all_points = c1 + c2 + c3
     # coords = [c1,c2,c3]   #points
     coords = [
         (17.5, 110, 7.5),    # ROI 1 center

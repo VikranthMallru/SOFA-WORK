@@ -36,9 +36,10 @@ x_center = (x_max + x_min) / 2
 y_center = (y_max + y_min) / 2
 z_center = (z_max + z_min) / 2
 
-x_lim = [x_center - max_range/2, x_center + max_range/2]
-y_lim = [y_center - max_range/2, y_center + max_range/2]
-z_lim = [z_center - max_range/2, z_center + max_range/2]
+margin = 0.56  # 20% margin
+x_lim = [x_center - max_range/2 - margin*max_range, x_center + max_range/2 + margin*max_range]
+y_lim = [y_center - max_range/2 - margin*max_range, y_center + max_range/2 + margin*max_range]
+z_lim = [z_center - max_range/2 - margin*max_range, z_center + max_range/2 + margin*max_range]
 
 def fit_circle_3d(p1, p2, p3):
     v1 = p2 - p1
@@ -159,8 +160,20 @@ def plot_row(row_idx):
         radius_or_length = line_len
         radius_label = "Line Length"
     else:
+        # Generate circle points
         circle_points = generate_circle_points(center, radius, e1, e2)
-        segments = [[circle_points[i], circle_points[i+1]] for i in range(len(circle_points) - 1)]
+        # Only keep segments where BOTH endpoints are inside the limits
+        segments = []
+        for i in range(len(circle_points) - 1):
+            p1 = circle_points[i]
+            p2 = circle_points[i+1]
+            # Check if both endpoints are inside all axis limits
+            if (
+                x_lim[0] <= p1[0] <= x_lim[1] and x_lim[0] <= p2[0] <= x_lim[1] and
+                y_lim[0] <= p1[1] <= y_lim[1] and y_lim[0] <= p2[1] <= y_lim[1] and
+                z_lim[0] <= p1[2] <= z_lim[1] and z_lim[0] <= p2[2] <= z_lim[1]
+            ):
+                segments.append([p1, p2])
         circle_line = Line3DCollection(segments, colors='r', linewidths=1.5, alpha=1.0)
         if check.get_status()[2] and check.get_status()[0]:
             ax.add_collection3d(circle_line)
@@ -192,13 +205,17 @@ def plot_row(row_idx):
 
     legend_ax.legend(legend_handles, legend_labels, loc='upper left', fontsize=13, frameon=True)  # Increased font size
 
-    ax.set_xlabel('X')  # Axes labels remain default size
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+
+    f = 14
+    ax.set_xlabel('X', fontsize=f)
+    ax.set_ylabel('Y', fontsize=f)
+    ax.set_zlabel('Z', fontsize=f)
+    ax.tick_params(axis='both', which='major', labelsize=16)
+    ax.tick_params(axis='both', which='minor', labelsize=14)
     ax.set_title(
         f'{radius_label}: {radius_or_length:.4f} ; '
         f'Total Error: {total_error:.4f} ; Percent Error: {percent_error:.2f}%',
-        fontsize=18  # Increased title font size
+        fontsize=18
     )
     ax.set_xlim(x_lim)
     ax.set_ylim(y_lim)

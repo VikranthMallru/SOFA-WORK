@@ -84,12 +84,10 @@ sc = None
 def plot_slider_mode(angle):
     ax.clear()
     rotated = rotate_points(all_points, angle, axis_point, axis='y')
-    xlim, ylim, zlim = get_limits(workspace_points)
     ax.scatter(rotated[:,0], rotated[:,1], rotated[:,2], color='blue', s=2)
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
-    ax.set_zlim(zlim)
-    # Hide x-axis and its values
+    ax.set_xlim([0, 120])
+    ax.set_ylim([0, 120])
+    ax.set_zlim([-20, 120])
     ax.set_xlabel('')
     ax.set_xticks([])
     try:
@@ -107,12 +105,11 @@ def plot_slider_mode(angle):
 
 def plot_workspace_mode():
     ax.clear()
-    xlim, ylim, zlim = get_limits(workspace_points)
     ax.scatter(workspace_points[:,0], workspace_points[:,1], workspace_points[:,2],
                color='blue', s=1, alpha=0.4, rasterized=True)
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
-    ax.set_zlim(zlim)
+    ax.set_xlim([0, 120])
+    ax.set_ylim([0, 120])
+    ax.set_zlim([0, 120])
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')

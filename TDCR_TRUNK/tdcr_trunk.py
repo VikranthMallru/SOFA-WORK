@@ -13,7 +13,7 @@ import csv
 import numpy as np
 # from matplotlib import pyplot as plt
 from cuda_elastic import CudaElasticMaterialObject
-def rotate_cable_points(points, deg, center=(24.76,0.0,24.76)):
+def rotate_cable_points(points, deg, center=(19.75,0,19.75)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
            return [list(pt) for pt in points]
@@ -141,34 +141,24 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
 # fixingBox=[-1,0,-1,51.52,7,51.52]
 
 
-
-
+x = 17.35
+y = 272.68
+z = 19.75
+d = 1  # half the size of the fixing box
+# 19.75 - 5.4 = 14.35
 def TDCR_trunk(parentNode, name="TDCR_trunk",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
-         fixingBox=[-1,-4,-1,50.52,10,50.52] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
-# fixingBox=  
+         fixingBox=[-1,-4,-1,41.50,10,41.50] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
+# fixingBox=[-1,-4,-1,41.50,10,41.50] 
     tdcr = parentNode.addChild(name)
 # 
     # Deformable object (visual + FEM)
     
-    # soft_body = ElasticMaterialObject(tdcr,
-    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
-    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
-    #     collisionMesh="tdcr_trunk_collision.stl",
-    #     withConstraint=False,
-    #     youngModulus=600_000.0,  # Young's modulus in Pascals
-    #     poissonRatio=0.20,
-    #     totalMass=0.115,
-    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
-    #     rotation=rotation,
-    #     translation=translation
-    # )
-
-    soft_body = CudaElasticMaterialObject(tdcr,
+    soft_body = ElasticMaterialObject(tdcr,
         volumeMeshFileName="tdcr_trunk_volume.vtk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
-        withConstrain=False,
+        withConstraint=False,
         youngModulus=600_000.0,  # Young's modulus in Pascals
         poissonRatio=0.20,
         totalMass=0.115,
@@ -177,10 +167,23 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
         translation=translation
     )
 
+    # soft_body = CudaElasticMaterialObject(tdcr,
+    #     volumeMeshFileName="tdcr_trunk_volume.vtk",
+    #     surfaceMeshFileName="tdcr_trunk_surface.stl",
+    #     collisionMesh="tdcr_trunk_collision.stl",
+    #     withConstrain=False,
+    #     youngModulus=60_000.0,  # Young's modulus in Pascals
+    #     poissonRatio=0.20,
+    #     totalMass=0.115,
+    #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
+    #     rotation=rotation,
+    #     translation=translation
+    # )
+
     
-    # soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
-    # soft_body.collisionmodel.LineCollisionModel.selfCollision = True
-    # soft_body.collisionmodel.PointCollisionModel.selfCollision = True
+    soft_body.collisionmodel.TriangleCollisionModel.selfCollision = True   
+    soft_body.collisionmodel.LineCollisionModel.selfCollision = True
+    soft_body.collisionmodel.PointCollisionModel.selfCollision = True
 
         # self.collisionmodel.createObject('TriangleCollisionModel')
         # self.collisionmodel.createObject('LineCollisionModel')
@@ -256,21 +259,21 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
 
     c2_r = rotate_cable_points(c1, 270)
     # Lower the pull point by 3 units in y direction
-    # pull2 = [c2_r[0][0], c2_r[0][1] - 3, c2_r[0][2]]
-    # cable2 = PullingCable(soft_body,
-    #                       "PullingCable_2",
-    #                       pullPointLocation=pull2,
-    #                       rotation=rotation,
-    #                       translation=translation,
-    #                       cableGeometry=c2_r)
-    # cable2.CableConstraint.minForce = minForce
-    # cable2.CableConstraint.maxForce = maxForce
+    pull2 = [c2_r[0][0], c2_r[0][1] - 3, c2_r[0][2]]
+    cable2 = PullingCable(soft_body,
+                          "PullingCable_2",
+                          pullPointLocation=pull2,
+                          rotation=rotation,
+                          translation=translation,
+                          cableGeometry=c2_r)
+    cable2.CableConstraint.minForce = minForce
+    cable2.CableConstraint.maxForce = maxForce
 
     
 
 
     # controller = TDCR_trunk_Controller([cable1,cable2],roi_node=roi, soft_body_node=soft_body)
-    controller = TDCR_trunk_Controller([cable1],roi_node=roi, soft_body_node=soft_body)
+    controller = TDCR_trunk_Controller([cable1,cable2],roi_node=roi, soft_body_node=soft_body)
     soft_body.addObject(controller)
     tdcr.addObject('EulerImplicitSolver', rayleighStiffness=0.1, rayleighMass=0.1)
 
