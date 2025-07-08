@@ -55,28 +55,28 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         
         key = event["key"]
 
-        if key in self.pull_keys:
-            idx = self.pull_keys[key]
-            self._adjust_cable(idx, self.displacement_step)
-            # self._adjust_cable(1, -self.displacement_step)
-# 
-        # Release single cable
-        elif key in self.release_keys:
-            idx = self.release_keys[key]
-            self._adjust_cable(idx, -self.displacement_step)
-            # self._adjust_cable(1, self.displacement_step)
+#         if key in self.pull_keys:
+#             idx = self.pull_keys[key]
+#             self._adjust_cable(idx, self.displacement_step)
+#             # self._adjust_cable(1, -self.displacement_step)
+# # 
+#         # Release single cable
+#         elif key in self.release_keys:
+#             idx = self.release_keys[key]
+#             self._adjust_cable(idx, -self.displacement_step)
+#             # self._adjust_cable(1, self.displacement_step)
 #        # Constrained displacement of cables
-        # if key == "1":
-        #     if (self.cables[0].CableConstraint.value[0] + self.displacement_step <= self.max_displacement and
-        #         self.cables[1].CableConstraint.value[0] - self.displacement_step >= self.min_displacement):
-        #         self._adjust_cable(0, self.displacement_step)
-        #         self._adjust_cable(1, -self.displacement_step)
+        if key == "1":
+            if (self.cables[0].CableConstraint.value[0] + self.displacement_step <= self.max_displacement and
+                self.cables[1].CableConstraint.value[0] - self.displacement_step >= self.min_displacement):
+                self._adjust_cable(0, self.displacement_step)
+                self._adjust_cable(1, -self.displacement_step)
 
-        # elif key == "2":
-        #     if (self.cables[0].CableConstraint.value[0] - self.displacement_step >= self.min_displacement and
-        #         self.cables[1].CableConstraint.value[0] + self.displacement_step <= self.max_displacement):
-        #         self._adjust_cable(0, -self.displacement_step)
-        #         self._adjust_cable(1, self.displacement_step)
+        elif key == "2":
+            if (self.cables[0].CableConstraint.value[0] - self.displacement_step >= self.min_displacement and
+                self.cables[1].CableConstraint.value[0] + self.displacement_step <= self.max_displacement):
+                self._adjust_cable(0, -self.displacement_step)
+                self._adjust_cable(1, self.displacement_step)
 
 
         # Contract all cables
@@ -141,15 +141,15 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
 # fixingBox=[-1,0,-1,51.52,7,51.52]
 
 
-x = 17.35
+x = 19.75
 y = 272.68
 z = 19.75
 d = 1  # half the size of the fixing box
 # 19.75 - 5.4 = 14.35
 def TDCR_trunk(parentNode, name="TDCR_trunk",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
-         fixingBox=[-1,-4,-1,41.50,10,41.50] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
-# fixingBox=[-1,-4,-1,41.50,10,41.50] 
+         fixingBox=[0,-4,0,39.5,10,39.50] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
+# fixingBox=[-1,-4,-1,41.50,10,41.50] [x-d,y-d,z-d,x+d,y+d,z+d]
     tdcr = parentNode.addChild(name)
 # 
     # Deformable object (visual + FEM)
@@ -159,7 +159,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
         withConstraint=False,
-        youngModulus=600_000.0,  # Young's modulus in Pascals
+        youngModulus=60_000.0,  # Young's modulus in Pascals
         poissonRatio=0.20,
         totalMass=0.115,
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
@@ -244,7 +244,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     
     #Add the Cables
     c1 = loadPointListFromFile("cable1.json")
-    c1_r = rotate_cable_points(c1, 90)
+    c1_r = rotate_cable_points(c1, 0)
     # Lower the pull point by 3 units in y direction
 
     pull1 = [c1_r[0][0], c1_r[0][1] - 3, c1_r[0][2]]
@@ -257,7 +257,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     cable1.CableConstraint.minForce = minForce
     cable1.CableConstraint.maxForce = maxForce
 
-    c2_r = rotate_cable_points(c1, 270)
+    c2_r = rotate_cable_points(c1_r, 180)
     # Lower the pull point by 3 units in y direction
     pull2 = [c2_r[0][0], c2_r[0][1] - 3, c2_r[0][2]]
     cable2 = PullingCable(soft_body,

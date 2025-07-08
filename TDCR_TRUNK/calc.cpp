@@ -6,7 +6,7 @@ using namespace std;
 
 int main() {
     // Input two points in 3D
-    double x1=3, y1=0, z1=19.75, x2=17.35, y2 = 272.68, z2 = 19.75;
+    double x1=3, y1=0, z1=19.75, x2=16, y2 = 272.68, z2 = 19.75;
 
 
     // Direction vector
@@ -14,12 +14,12 @@ int main() {
     double dy = y2 - y1;
     double dz = z2 - z1;
 
-    vector<double> delta_y = {18.86,17.95,17.05,16.16,15.35,14.54,13.81,13.09,12.43,11.78,11.19,10.60,10.07,9.54,9.06,8.59,8.16,7.73,7.34,6.95,6.61,6.26,5.95,2.52,1.65};
+    vector<double> delta_y = {11.09,18.86,17.95,17.05,16.16,15.35,14.54,13.81,13.09,12.43,11.78,11.19,10.60,10.07,9.54,9.06,8.59,8.16,7.73,7.34,6.95,6.61,6.26,5.95,2.52};
     vector<double> y_values;
     double t = 0.0;
     double total_length = 0.0;
     for (double d : delta_y) total_length += d;
-    cout<<"total length:"<<total_length<<'\n';
+    cout << "total length: " << total_length - y2 << ", number of elements in delta_y: " << delta_y.size() << '\n';
 
     // Output in the requested format
     cout << fixed << setprecision(3);
