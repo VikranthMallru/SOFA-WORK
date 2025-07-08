@@ -52,32 +52,54 @@ Fv_data = [
     (rigid_object_df, 'Rigid Object')
 ]
 
-def plot_all(log_scale=False):
-    plt.clf()
-    plt.figure(figsize=(10, 6))
+# --- Matplotlib interactive plot with toggle button ---
+fig, ax = plt.subplots(figsize=(10, 6))
+plt.subplots_adjust(bottom=0.22)
+ax_button = plt.axes([0.7, 0.01, 0.13, 0.06])
+toggle_button = Button(ax_button, 'Toggle log/linear')
+ax_exp_button = plt.axes([0.84, 0.01, 0.13, 0.06])
+exp_button = Button(ax_exp_button, 'Toggle exp/normal')
+log_state = {'log': False}
+exp_state = {'exp': False}
+
+def plot_all():
+    ax.clear()
     for df, label in Fv_data:
         y = df['Fv'][:min_len]
-        if log_scale:
+        if log_state['log']:
             y = np.log10(np.clip(y, a_min=1e-8, a_max=None))
-        plt.plot(df.index[:min_len], y, label=label)
-    plt.xlabel('DeltaLv Step')
-    plt.ylabel('log10(Fv)' if log_scale else 'Fv')
-    plt.title(f'Fv vs DeltaLv Step\nalpha = {alpha}°, DeltaLv = {DeltaLv}' + (" (log scale)" if log_scale else ""))
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.draw()
-
-# --- Matplotlib interactive plot with toggle button ---
-fig = plt.figure(figsize=(10, 6))
-ax_button = plt.axes([0.8, 0.01, 0.15, 0.06])
-toggle_button = Button(ax_button, 'Toggle log/linear')
-log_state = {'log': False}
+        elif exp_state['exp']:
+            # Prevent overflow in exp
+            y = np.exp(np.clip(y, a_min=None, a_max=50))
+        ax.plot(df.index[:min_len], y, label=label)
+    ax.set_xlabel('DeltaLv Step')
+    if log_state['log']:
+        ax.set_ylabel('log10(Fv)')
+    elif exp_state['exp']:
+        ax.set_ylabel('exp(Fv)')
+    else:
+        ax.set_ylabel('Fv')
+    ax.set_title(f'Fv vs DeltaLv Step\nalpha = {alpha}°, DeltaLv = {DeltaLv}' +
+                 (" (log scale)" if log_state['log'] else "") +
+                 (" (exp scale)" if exp_state['exp'] else ""))
+    ax.legend()
+    ax.grid(True)
+    fig.canvas.draw_idle()
 
 def on_toggle(event):
     log_state['log'] = not log_state['log']
-    plot_all(log_state['log'])
+    if log_state['log']:
+        exp_state['exp'] = False  # Disable exp if log is enabled
+    plot_all()
 
-plot_all(log_state['log'])
+def on_exp_toggle(event):
+    exp_state['exp'] = not exp_state['exp']
+    if exp_state['exp']:
+        log_state['log'] = False  # Disable log if exp is enabled
+    plot_all()
+
 toggle_button.on_clicked(on_toggle)
+exp_button.on_clicked(on_exp_toggle)
+
+plot_all()
 plt.show()

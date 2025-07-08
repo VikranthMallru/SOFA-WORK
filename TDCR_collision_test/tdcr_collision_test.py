@@ -348,7 +348,6 @@ class TDCRController(Sofa.Core.Controller):
         with open(self.spine_csv_file, "w", newline="") as f:
             pass
 
-
     def auto_pull_cable(self, cable, displacement_step, interval, max_disp):
         """
         Pulls the given cable by displacement_step every interval seconds,
@@ -641,22 +640,22 @@ def createScene(rootNode):
     x = x + s / 2  
     fixing_box = [x - delta, y - delta2, z - delta2, x + delta, y + delta2, z + delta2]
 
-    # add_soft_object_from_stl(
-    #     rootNode,
-    #     name="SoftSphere",
-    #     volume_mesh="sphere_volume.vtk",
-    #     surface_mesh="sphere.stl",
-    #     collision_mesh="sphere.stl",
-    #     translation=position,
-    #     rotation=[0, 0, 0],
-    #     young_modulus=6_000,
-    #     poisson_ratio=0.25,
-    #     total_mass=0.03,
-    #     surface_color=[1, 1, 1, 1],
-    #     with_constraint=False,
-    #     fixing_box=fixing_box,  # Box from point-delta to point+delta
-    #     scale=[s, s, s]  # Adjust scale as needed
-    # )
+    add_soft_object_from_stl(
+        rootNode,
+        name="SoftSphere",
+        volume_mesh="sphere_volume.vtk",
+        surface_mesh="sphere.stl",
+        collision_mesh="sphere.stl",
+        translation=position,
+        rotation=[0, 0, 0],
+        young_modulus=6_000,
+        poisson_ratio=0.25,
+        total_mass=0.03,
+        surface_color=[1, 1, 1, 1],
+        with_constraint=False,
+        fixing_box=fixing_box,  # Box from point-delta to point+delta
+        scale=[s, s, s]  # Adjust scale as needed
+    )
 
     return rootNode
 
