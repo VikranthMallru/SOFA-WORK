@@ -11,8 +11,46 @@ import sys
 import os
 import csv
 import numpy as np
+from collections import defaultdict
+import time
+import threading
 # from matplotlib import pyplot as plt
 from cuda_elastic import CudaElasticMaterialObject
+def make_roi_boxes(coords, epsilons):
+    """Create box definitions for each point and epsilon."""
+    return [[x-e, y-e, z-e, x+e, y+e, z+e] for (x, y, z), e in zip(coords, epsilons)]
+
+def add_boxrois(parent_node, roi_boxes):
+    """Add BoxROI objects for each box definition."""
+    roi_nodes = []
+    for idx, box in enumerate(roi_boxes):
+        roi = parent_node.addChild(f"ROI_{idx+1}")
+        roi.addObject('BoxROI',
+                      name=f"roi_{idx+1}",
+                      template="Vec3d",
+                      box=box,
+                      drawBoxes=False,
+                      doUpdate=True,
+                      strict=False)
+        roi_nodes.append(roi)
+    return roi_nodes
+
+def add_monitors_to_rois(roi_nodes):
+    """Add a Monitor to each ROI node for trajectory display only."""
+    for idx, roi in enumerate(roi_nodes):
+        roi.addObject("Monitor",
+                      name="roiMonitor",
+                      template="Vec3d",
+                      listening=True,
+                      indices=f"@roi_{idx+1}.indices",
+                      showPositions=False,
+                      PositionsColor=[1.0, 0.0, 0.0, 1.0],
+                      showMinThreshold=0.01,
+                      showTrajectories=True,
+                      TrajectoriesPrecision=0.1,
+                      TrajectoriesColor=[1,1,0,1],
+                      ExportPositions=False)
+
 def rotate_cable_points(points, deg, center=(19.75,0,19.75)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
@@ -28,116 +66,233 @@ def rotate_cable_points(points, deg, center=(19.75,0,19.75)):
            rotated.append([x1 + cx, y, z1 + cz])
        return rotated
 
+def log_roi_csv(csv_file, cables, roi_nodes, soft_body_node, printInTerminal=1):
+    dofs = soft_body_node.getObject('dofs')
+    if dofs is None:
+        if printInTerminal:
+            print("MechanicalObject 'dofs' not found!")
+        return
+    positions = dofs.position.value
+    avg_roi_coords = []
+    for idx, roi in enumerate(roi_nodes):
+        boxroi = roi.getObject(f"roi_{idx+1}")
+        indices = boxroi.indices.value
+        roi_coords = [positions[i] for i in indices]
+        if roi_coords:
+            avg_x = sum(pt[0] for pt in roi_coords) / len(roi_coords)
+            avg_y = sum(pt[1] for pt in roi_coords) / len(roi_coords)
+            avg_z = sum(pt[2] for pt in roi_coords) / len(roi_coords)
+            avg_roi_coords += [f"{avg_x:.3f}", f"{avg_y:.3f}", f"{avg_z:.3f}"]
+        else:
+            avg_roi_coords += ["", "", ""]
+    disp_values = [c.CableConstraint.value[0] for c in cables]
+    force_values = [c.CableConstraint.force.value for c in cables]
+    file_exists = os.path.isfile(csv_file)
+    if (not file_exists or os.stat(csv_file).st_size == 0) and len(avg_roi_coords) > 0:
+        header = ["L1", "L2", "L3", "F1", "F2", "F3"]
+        n_boxes = len(avg_roi_coords) // 3
+        for i in range(1, n_boxes + 1):
+            header += [f"x{i}", f"y{i}", f"z{i}"]
+        with open(csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+    with open(csv_file, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [f"{d:.3f}" for d in disp_values] +
+            [f"{f:.3f}" for f in force_values] +
+            avg_roi_coords
+        )
+
+def spine_log_roi_csv(cables, roi_nodes, soft_body_node, roi_box_centers, spine_csv_file, y_tol=1e-5, printInTerminal=1):
+    dofs = soft_body_node.getObject('dofs')
+    if dofs is None:
+        if printInTerminal:
+            print("MechanicalObject 'dofs' not found!")
+        return
+    positions = dofs.position.value
+    y_groups = defaultdict(list)
+    for idx, center in enumerate(roi_box_centers):
+        y_val = center[1]
+        found = False
+        for y_key in y_groups:
+            if abs(y_val - y_key) < y_tol:
+                y_groups[y_key].append(idx)
+                found = True
+                break
+        if not found:
+            y_groups[y_val].append(idx)
+    group_points = []
+    for y_key in sorted(y_groups.keys()):
+        indices_in_group = y_groups[y_key]
+        points = []
+        for idx in indices_in_group:
+            roi = roi_nodes[idx]
+            boxroi = roi.getObject(f"roi_{idx+1}")
+            indices = boxroi.indices.value
+            roi_coords = [positions[i] for i in indices]
+            points.extend(roi_coords)
+        if points:
+            avg_x = sum(pt[0] for pt in points) / len(points)
+            avg_y = sum(pt[1] for pt in points) / len(points)
+            avg_z = sum(pt[2] for pt in points) / len(points)
+            group_points.append((avg_x, avg_y, avg_z))
+        else:
+            group_points.append(("", "", ""))
+    disp_values = [c.CableConstraint.value[0] for c in cables]
+    force_values = [c.CableConstraint.force.value for c in cables]
+    row = [f"{d:.3f}" for d in disp_values] + [f"{f:.3f}" for f in force_values]
+    for pt in group_points:
+        row += [f"{pt[0]:.3f}" if pt[0] != "" else "",
+                f"{pt[1]:.3f}" if pt[1] != "" else "",
+                f"{pt[2]:.3f}" if pt[2] != "" else ""]
+    file_exists = os.path.isfile(spine_csv_file)
+    if (not file_exists or os.stat(spine_csv_file).st_size == 0) and len(group_points) > 0:
+        header = ["L1", "L2", "L3", "F1", "F2", "F3"]
+        for i in range(1, len(group_points)+1):
+            header += [f"x{i}", f"y{i}", f"z{i}"]
+        with open(spine_csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+    with open(spine_csv_file, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(row)
+
 class TDCR_trunk_Controller(Sofa.Core.Controller):
-    def __init__(self, cable_nodes, roi_node, soft_body_node,*args, **kwargs):
+    def __init__(self, cable_nodes, roi_nodes, soft_body_node, roi_box_centers, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cables = cable_nodes  # List of 2 cable nodes
+        self.cables = cable_nodes  # List of 3 cable nodes
         self.name = "TDCR_trunk_Controller"
         self.displacement_step = 0.1
         self.max_displacement = 10000
         self.min_displacement = -10000
-        self.roi_node = roi_node
+        self.roi_nodes = roi_nodes
+        self.roi_box_centers = roi_box_centers
         self.soft_body_node = soft_body_node
         self.roi_points = None
 
+        self.csv_file = os.path.join(
+            "/home/ci/my_files/TDCR_TRUNK/CSV_Plots", 
+            "tdcr_trunk_output.csv"
+        )
+        self.spine_csv_file = os.path.join(
+            "/home/ci/my_files/TDCR_TRUNK/CSV_Plots", 
+            "tdcr_trunk_spine.csv"
+        )
         # Key mappings for pull and release
-        self.pull_keys = {"1": 0, "2": 1}
-        self.release_keys = {"!": 0, "@": 1}
+        self.pull_keys = {"1": 0, "2": 1, "3": 2}
+        self.release_keys = {"!": 0, "@": 1, "#": 2}
 
         # Initialize output directory and CSV file
-        self.output_dir = "/home/ci/my_files/TDCR_TRUNK/CSV_Plots"
-        os.makedirs(self.output_dir, exist_ok=True)
-        self.csv_file = os.path.join(self.output_dir, "tdcr_trunk_output.csv")
-        with open(self.csv_file, "w", newline="") as f:
-            pass
+        output_dir = "/home/ci/my_files/TDCR_TRUNK/CSV_Plots"
+        csv_files = [
+            os.path.join(output_dir, "tdcr_trunk_output.csv"),
+            os.path.join(output_dir, "tdcr_trunk_spine.csv")
+            ]
+        for file in csv_files:
+            with open(file, 'w'):
+                pass 
+
+    def cable_stepper(self, step_sizes, interval, steps):
+        """
+        Moves each cable by its step_size for a number of steps, with a pause between steps.
+        Args:
+            step_sizes: list/tuple of step sizes for each cable (e.g. [0.5, 0.5, 0.5])
+            interval: seconds between steps
+            steps: number of steps
+        """
+        def step_loop():
+            for i in range(steps):
+                for idx, step in enumerate(step_sizes):
+                    self._adjust_cable(idx, step)
+                print(f"Step {i+1}/{steps}: " +
+                      ", ".join(f"L{j+1}={self.cables[j].CableConstraint.value[0]:.3f}" for j in range(len(self.cables))))
+                log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                time.sleep(interval)
+            print("Cable stepping finished.")
+        threading.Thread(target=step_loop, daemon=True).start()
+
+    def cable_stepper_to_goal(self, step_sizes, interval, goals):
+        """
+        Moves each cable by its step_size every interval until it reaches its goal.
+        Args:
+            step_sizes: list of step sizes for each cable (e.g. [0.5, 0.5, 0.5])
+            interval: seconds between steps
+            goals: list of final destination values for each cable (e.g. [10.0, 10.0, 10.0])
+        """
+        def step_loop():
+            while True:
+                done = True
+                for idx, (step, goal) in enumerate(zip(step_sizes, goals)):
+                    current = self.cables[idx].CableConstraint.value[0]
+                    diff = goal - current
+                    if abs(diff) > abs(step):
+                        move = step if diff > 0 else -abs(step)
+                        self._adjust_cable(idx, move)
+                        done = False
+                    elif abs(diff) > 1e-6:
+                        self._adjust_cable(idx, diff)
+                print("Cable positions: " +
+                      ", ".join(f"L{j+1}={self.cables[j].CableConstraint.value[0]:.3f}" for j in range(len(self.cables))))
+                log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                if done:
+                    print("Cable stepping to goal finished.")
+                    break
+                time.sleep(interval)
+        threading.Thread(target=step_loop, daemon=True).start()
 
     def onKeypressedEvent(self, event):
         
         key = event["key"]
 
-#         if key in self.pull_keys:
-#             idx = self.pull_keys[key]
-#             self._adjust_cable(idx, self.displacement_step)
-#             # self._adjust_cable(1, -self.displacement_step)
-# # 
-#         # Release single cable
-#         elif key in self.release_keys:
-#             idx = self.release_keys[key]
-#             self._adjust_cable(idx, -self.displacement_step)
-#             # self._adjust_cable(1, self.displacement_step)
+        if key in self.pull_keys:
+            idx = self.pull_keys[key]
+            self._adjust_cable(idx, self.displacement_step)
+        elif key in self.release_keys:
+            idx = self.release_keys[key]
+            self._adjust_cable(idx, -self.displacement_step)
+            # self._adjust_cable(1, self.displacement_step)
 #        # Constrained displacement of cables
-        if key == "1":
-            if (self.cables[0].CableConstraint.value[0] + self.displacement_step <= self.max_displacement and
-                self.cables[1].CableConstraint.value[0] - self.displacement_step >= self.min_displacement):
-                self._adjust_cable(0, self.displacement_step)
-                self._adjust_cable(1, -self.displacement_step)
+        # if key == "1":
+        #     if (self.cables[0].CableConstraint.value[0] + self.displacement_step <= self.max_displacement and
+        #         self.cables[1].CableConstraint.value[0] - self.displacement_step >= self.min_displacement):
+        #         self._adjust_cable(0, self.displacement_step)
+        #         self._adjust_cable(1, -self.displacement_step)
 
-        elif key == "2":
-            if (self.cables[0].CableConstraint.value[0] - self.displacement_step >= self.min_displacement and
-                self.cables[1].CableConstraint.value[0] + self.displacement_step <= self.max_displacement):
-                self._adjust_cable(0, -self.displacement_step)
-                self._adjust_cable(1, self.displacement_step)
+        # elif key == "2":
+        #     if (self.cables[0].CableConstraint.value[0] - self.displacement_step >= self.min_displacement and
+        #         self.cables[1].CableConstraint.value[0] + self.displacement_step <= self.max_displacement):
+        #         self._adjust_cable(0, -self.displacement_step)
+        #         self._adjust_cable(1, self.displacement_step)
 
 
         # Contract all cables
         elif key == "4":
             for idx in range(len(self.cables)):
                 self._adjust_cable(idx, self.displacement_step)
-
-        # Expand all cables
         elif key == "$":
             for idx in range(len(self.cables)):
                 self._adjust_cable(idx, -self.displacement_step)
+        # Automated movement: step to goal for all cables
+        elif key == "0":
+            # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
+            self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.1,goals= [200.0, 0,0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
         force_values = [c.CableConstraint.force.value for c in self.cables]
         print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
-        self.ROIextractionAndCSVLogging(disp_values, force_values)
+
+        log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+        spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
 
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
         new_disp = current_disp + delta
         self.cables[idx].CableConstraint.value = [new_disp]
 
-    def ROIextractionAndCSVLogging(self, disp_values, force_values):
-        if self.roi_points is None:
-            self.roi_points = self.roi_node.getObject('roi')
-            # print("roi_points initialized:", self.roi_points)
-        if self.roi_points:
-            indices = self.roi_points.indices.value
-            dofs = self.soft_body_node.getObject('dofs')
-            if dofs is not None:
-                positions = dofs.position.value
-                roi_coords = []
-                for i in indices:
-                    x, y, z = positions[i]
-                    roi_coords.append((x, y, z))
-                print("ROI points:")
-                for idx, (x, y, z) in enumerate(roi_coords):
-                    print(f"Point {idx+1}: ({x:.3f}, {y:.3f}, {z:.3f})")
-                flat_coords = []
-                for (x, y, z) in roi_coords:
-                    flat_coords += [f"{x:.3f}", f"{y:.3f}", f"{z:.3f}"]
-                file_exists = os.path.isfile(self.csv_file)
-                if (not file_exists or os.stat(self.csv_file).st_size == 0) and len(roi_coords) > 0:
-                    header = ["L1", "L2", "F1", "F2"]
-                    for i in range(len(roi_coords)):
-                        header += [f"x{i+1}", f"y{i+1}", f"z{i+1}"]
-                    with open(self.csv_file, "w", newline="") as f:
-                        writer = csv.writer(f)
-                        writer.writerow(header)
-                with open(self.csv_file, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(
-                        [f"{d:.3f}" for d in disp_values] +
-                        [f"{f:.3f}" for f in force_values] +
-                        flat_coords
-                    )
-            else:
-                print("MechanicalObject 'dofs' not found!")
-        else:
-            print("ROI points engine not initialized!")
 # fixingBox=[-1,0,-1,51.52,7,51.52]
 
 
@@ -200,44 +355,8 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
 
     # Fix the base
     FixedBox(soft_body, atPositions=fixingBox, doVisualization=True)
+
     
-    # FORCE APPLICATION
-    roi = soft_body.addChild("ROI")#add roi as child to soft_body(duh)
-    # Region of Interest (ROI)
-    x=24.76
-    y=0.0
-    z=2.5
-    delta = 0.1
-    # roi.addObject("BoxROI",
-    #           name="roi",
-    #           box=[x-delta,y-delta,z-delta,x+delta,y+delta,z+delta],  # (xMin, yMin, zMin, xMax, yMax, zMax)
-    #           drawBoxes=True,
-    #           doUpdate=True)
-    # roi.addObject("ConstantForceField",
-    #           name="roiConstForce",
-    #         #   indices="@roi.indices",
-    #           force=[0, 0, 0])
-    
-    # roi.addObject("Monitor",
-    # name="roiMonitor",
-    # template="CudaVec3f",
-    # listening=True,
-    # indices="@roi.indices",
-
-    # showPositions=True,
-    # showVelocities=False,
-
-    # showTrajectories=True,
-    # PositionsColor=[1.0, 0.0, 0.0, 1.0],
-    # VelocitiesColor=[0.0, 1.0, 0.0, 1.0],
-    # ForcesColor=[0.0, 0.0, 1.0, 1.0],
-    # sizeFactor=0.8,
-    # showMinThreshold=0.01,
-    # TrajectoriesPrecision=0.1,
-    # TrajectoriesColor= [1,1,0,1]
-    # # ExportPath="/home/ci/my_files/TDCR_TRUNK/Plots/roiMonitor_"
-    # )
-
 
 
 
@@ -257,8 +376,11 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     cable1.CableConstraint.minForce = minForce
     cable1.CableConstraint.maxForce = maxForce
 
-    c2_r = rotate_cable_points(c1_r, 180)
-    # Lower the pull point by 3 units in y direction
+    delta = 0
+    # For cable 2: rotate and shift all y by +delta, then remove last point
+    c2_r = rotate_cable_points(c1_r, 120)
+    c2_r = [[x, y + delta, z] for x, y, z in c2_r]
+    # c2_r = c2_r[:-2]  # Remove last point
     pull2 = [c2_r[0][0], c2_r[0][1] - 3, c2_r[0][2]]
     cable2 = PullingCable(soft_body,
                           "PullingCable_2",
@@ -269,12 +391,30 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     cable2.CableConstraint.minForce = minForce
     cable2.CableConstraint.maxForce = maxForce
 
+    # For cable 3: rotate and shift all y by +delta, then remove last point
+    c3_r = rotate_cable_points(c1_r, 240)
+    c3_r = [[x, y + delta, z] for x, y, z in c3_r]
+    # c3_r = c3_r[:-2]  # Remove last point
+    pull3 = [c3_r[0][0], c3_r[0][1] - 3, c3_r[0][2]]
+    cable3 = PullingCable(soft_body,
+                          "PullingCable_3",
+                          pullPointLocation=pull3,
+                          rotation=rotation,
+                          translation=translation,
+                          cableGeometry=c3_r)
+    cable3.CableConstraint.minForce = minForce
+    cable3.CableConstraint.maxForce = maxForce
     
-
+    roi_centers = c1_r + c2_r + c3_r
+    epsilons = [5.0] * len(roi_centers)
+    roi_boxes = make_roi_boxes(roi_centers, epsilons)
+    roi_nodes = add_boxrois(soft_body, roi_boxes)
+    add_monitors_to_rois(roi_nodes)
 
     # controller = TDCR_trunk_Controller([cable1,cable2],roi_node=roi, soft_body_node=soft_body)
-    controller = TDCR_trunk_Controller([cable1,cable2],roi_node=roi, soft_body_node=soft_body)
+    controller = TDCR_trunk_Controller([cable1, cable2, cable3], roi_nodes=roi_nodes, soft_body_node=soft_body, roi_box_centers=roi_centers)
     soft_body.addObject(controller)
+
     tdcr.addObject('EulerImplicitSolver', rayleighStiffness=0.1, rayleighMass=0.1)
 
 
@@ -344,3 +484,7 @@ def createScene(rootNode):
 
 
     return rootNode
+'''tracking: position from standard tdcr code
+validation: NelderMead optimization
+theta optimization
+images'''

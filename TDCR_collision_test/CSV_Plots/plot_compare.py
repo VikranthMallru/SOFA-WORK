@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.widgets import Button
+from matplotlib.widgets import Button, CheckButtons
 
 # --- User-defined variables ---
 DeltaLv = 8.0  
@@ -52,26 +52,34 @@ Fv_data = [
     (rigid_object_df, 'Rigid Object')
 ]
 
-# --- Matplotlib interactive plot with toggle button ---
+# --- Matplotlib interactive plot with toggle buttons ---
 fig, ax = plt.subplots(figsize=(10, 6))
-plt.subplots_adjust(bottom=0.22)
+plt.subplots_adjust(left=0.25, bottom=0.22)
 ax_button = plt.axes([0.7, 0.01, 0.13, 0.06])
 toggle_button = Button(ax_button, 'Toggle log/linear')
 ax_exp_button = plt.axes([0.84, 0.01, 0.13, 0.06])
 exp_button = Button(ax_exp_button, 'Toggle exp/normal')
+
+# CheckButtons for toggling each plot
+labels = [label for _, label in Fv_data]
+visibility = [True] * len(labels)
+check_ax = plt.axes([0.01, 0.25, 0.18, 0.25])
+check = CheckButtons(check_ax, labels, visibility)
+
 log_state = {'log': False}
 exp_state = {'exp': False}
+plot_visibility = {label: True for label in labels}
 
 def plot_all():
     ax.clear()
-    for df, label in Fv_data:
-        y = df['Fv'][:min_len]
-        if log_state['log']:
-            y = np.log10(np.clip(y, a_min=1e-8, a_max=None))
-        elif exp_state['exp']:
-            # Prevent overflow in exp
-            y = np.exp(np.clip(y, a_min=None, a_max=50))
-        ax.plot(df.index[:min_len], y, label=label)
+    for (df, label) in Fv_data:
+        if plot_visibility[label]:
+            y = df['Fv'][:min_len]
+            if log_state['log']:
+                y = np.log10(np.clip(y, a_min=1e-8, a_max=None))
+            elif exp_state['exp']:
+                y = np.exp(np.clip(y, a_min=None, a_max=50))
+            ax.plot(df.index[:min_len], y, label=label)
     ax.set_xlabel('DeltaLv Step')
     if log_state['log']:
         ax.set_ylabel('log10(Fv)')
@@ -98,8 +106,13 @@ def on_exp_toggle(event):
         log_state['log'] = False  # Disable log if exp is enabled
     plot_all()
 
+def func(label):
+    plot_visibility[label] = not plot_visibility[label]
+    plot_all()
+
 toggle_button.on_clicked(on_toggle)
 exp_button.on_clicked(on_exp_toggle)
+check.on_clicked(func)
 
 plot_all()
 plt.show()

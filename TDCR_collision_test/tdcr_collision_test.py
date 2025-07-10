@@ -432,7 +432,7 @@ class TDCRController(Sofa.Core.Controller):
 
         if key == "0":
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
-            DeltaLv = 7.0
+            DeltaLv = 10.0
             alpha_deg = 90.0
             steps =(int) (50.0 * DeltaLv) 
             interval = 0.1
@@ -648,7 +648,7 @@ def createScene(rootNode):
         collision_mesh="sphere.stl",
         translation=position,
         rotation=[0, 0, 0],
-        young_modulus=6_000,
+        young_modulus=600,
         poisson_ratio=0.25,
         total_mass=0.03,
         surface_color=[1, 1, 1, 1],
