@@ -278,7 +278,8 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         # Automated movement: step to goal for all cables
         elif key == "0":
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
-            self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.1,goals= [200.0, 0,0])
+            # self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.1,goals= [200.0, 0,0])
+            self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [10.0, 10.0,10.0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
@@ -415,7 +416,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     controller = TDCR_trunk_Controller([cable1, cable2, cable3], roi_nodes=roi_nodes, soft_body_node=soft_body, roi_box_centers=roi_centers)
     soft_body.addObject(controller)
 
-    tdcr.addObject('EulerImplicitSolver', rayleighStiffness=0.1, rayleighMass=0.1)
+    tdcr.addObject('EulerImplicitSolver', rayleighStiffness=0.5, rayleighMass=0.5)
 
 
     # Collision model
