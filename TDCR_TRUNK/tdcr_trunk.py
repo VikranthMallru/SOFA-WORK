@@ -46,7 +46,7 @@ def add_monitors_to_rois(roi_nodes):
                       showPositions=False,
                       PositionsColor=[1.0, 0.0, 0.0, 1.0],
                       showMinThreshold=0.01,
-                      showTrajectories=True,
+                      showTrajectories=False,
                       TrajectoriesPrecision=0.1,
                       TrajectoriesColor=[1,1,0,1],
                       ExportPositions=False)
@@ -233,10 +233,13 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
                         done = False
                     elif abs(diff) > 1e-6:
                         self._adjust_cable(idx, diff)
-                print("Cable positions: " +
-                      ", ".join(f"L{j+1}={self.cables[j].CableConstraint.value[0]:.3f}" for j in range(len(self.cables))))
+                # print("Cable positions: " + ", ".join(f"L{j+1}={self.cables[j].CableConstraint.value[0]:.3f}" for j in range(len(self.cables))))
                 log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
                 spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                disp_values = [c.CableConstraint.value[0] for c in self.cables]
+                print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+                force_values = [c.CableConstraint.force.value for c in self.cables]
+                print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
                 if done:
                     print("Cable stepping to goal finished.")
                     break
@@ -278,8 +281,8 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         # Automated movement: step to goal for all cables
         elif key == "0":
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
-            # self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.1,goals= [200.0, 0,0])
-            self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [10.0, 10.0,10.0])
+            self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.5,goals= [200.0, 0,0])
+            # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
@@ -315,7 +318,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
         surfaceMeshFileName="tdcr_trunk_surface.stl",
         collisionMesh="tdcr_trunk_collision.stl",
         withConstraint=False,
-        youngModulus=60_000.0,  # Young's modulus in Pascals
+        youngModulus=8_000.0,  # Young's modulus in Pascals
         poissonRatio=0.20,
         totalMass=0.115,
         surfaceColor=[0.96, 0.87, 0.70, 1.0],
@@ -328,7 +331,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     #     surfaceMeshFileName="tdcr_trunk_surface.stl",
     #     collisionMesh="tdcr_trunk_collision.stl",
     #     withConstrain=False,
-    #     youngModulus=60_000.0,  # Young's modulus in Pascals
+    #     youngModulus=8_000.0,  # Young's modulus in Pascals
     #     poissonRatio=0.20,
     #     totalMass=0.115,
     #     surfaceColor=[0.96, 0.87, 0.70, 1.0],
