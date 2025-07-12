@@ -120,7 +120,7 @@ L1_disp = np.array(L1_disp)
 diff_curve = np.gradient(all_rms_errors)
 
 # --- Only plot from a given frame onward ---
-start_idx = 299  # 0-based index for 300th frame; edit this value to change starting frame
+start_idx = 300 # 0-based index for 300th frame; edit this value to change starting frame
 
 # --- Mask out points where differentiation > 5 ---
 mask = np.abs(diff_curve[start_idx:]) <= 0.01
@@ -139,7 +139,7 @@ plt.plot(
 plt.axhline(15, color='gray', linestyle='--', linewidth=1, label='15% threshold')
 plt.xlabel('Cable Displacement (L1)', fontsize=14)
 plt.ylabel('Value', fontsize=14)
-plt.title(f'RMS Error (%) and Its Derivative (from frame {start_idx+1})', fontsize=15)
+plt.title(f'RMS Error (%)', fontsize=15)
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
