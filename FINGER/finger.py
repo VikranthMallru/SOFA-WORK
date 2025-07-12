@@ -118,7 +118,9 @@ def add_soft_object_from_stl(parent_node,
                              surface_color=[0.96, 0.87, 0.70, 1.0],
                              rotation=[0.0, 0.0, 0.0],
                              translation=[0.0, 0.0, 0.0],
-                             with_constraint=False):
+                             with_constraint=False,
+                             fixing_box=None,
+                             scale=[1, 1, 1]):
     """
     Adds a soft object from STL/VTK meshes to the parent_node using ElasticMaterialObject.
     """
@@ -133,10 +135,15 @@ def add_soft_object_from_stl(parent_node,
         surfaceColor=surface_color,
         rotation=rotation,
         translation=translation,
-        withConstraint=with_constraint
+        withConstraint=with_constraint,
+        scale = scale
     )
     parent_node.addChild(soft_obj)
+    # Add fixing box if provided
+    if fixing_box is not None:
+        FixedBox(soft_obj, atPositions=fixing_box, doVisualization=True)
     return soft_obj
+
 class FingerController(Sofa.Core.Controller):
     def __init__(self, *args, **kwargs):
         Sofa.Core.Controller.__init__(self, args, kwargs)
@@ -180,7 +187,7 @@ def Finger(parentNode=None, name="Finger",
         with_constraint=False
     )
 
-    finger.addChild(soft_body)
+    # finger.addChild(soft_body)
 
     FixedBox(soft_body, atPositions=transformed_box, doVisualization=True)
 
@@ -232,12 +239,35 @@ def loadRequiredPlugins(rootNode):
 
 def createScene(rootNode):
     loadRequiredPlugins(rootNode)
-    MainHeader(rootNode, gravity=[0.0, -981.0, 0.0], plugins=["SoftRobots"])
-    ContactHeader(rootNode, alarmDistance=4, contactDistance=0.1, frictionCoef=0.08)
+    MainHeader(rootNode, gravity=[0.0, 0.0, 0.0], plugins=["SoftRobots"])
+    ContactHeader(rootNode, alarmDistance=4, contactDistance=0.1, frictionCoef=0.5)
     rootNode.VisualStyle.displayFlags = "showBehavior HideVisual"
 
     Finger(rootNode, name="Finger1", translation=[0.0, 0.0, 0.0], rotation=[0.0, 0.0, 0.0])
     Finger(rootNode, name="Finger2", translation=[60.0, 0.0, 14.0], rotation=[0.0, 180.0, 0.0])
+    position = [30,65,9]
+    s = 25
+    delta = 1  # Adjust delta as needed
+    delta2 = 10
+    x, y, z = position
+    # x = x + s / 2  
+    fixing_box = [x - delta, y - delta, z - delta, x + delta, y + delta, z + delta]
 
+    add_soft_object_from_stl(
+        rootNode,
+        name="SoftSphere",
+        volume_mesh="sphere_volume.vtk",
+        surface_mesh="sphere.stl",
+        collision_mesh="sphere.stl",
+        translation=position,
+        rotation=[0, 0, 0],
+        young_modulus=600,
+        poisson_ratio=0.25,
+        total_mass=0.03,
+        surface_color=[1, 1, 1, 1],
+        with_constraint=False,
+        fixing_box=fixing_box,  # Box from point-delta to point+delta
+        scale=[s, s, s]  # Adjust scale as needed
+    )
 
     return rootNode
