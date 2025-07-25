@@ -47,7 +47,7 @@ def add_boxrois(parent_node, roi_boxes):
                       name=f"roi_{idx+1}",
                       template="Vec3d",
                       box=box,
-                      drawBoxes=False,
+                      drawBoxes=True,
                       doUpdate=True,
                       strict=False)
         roi_nodes.append(roi)
@@ -64,7 +64,7 @@ def add_monitors_to_rois(roi_nodes):
             showPositions=False,
             PositionsColor=[1.0, 0.0, 0.0, 1.0],
             showMinThreshold=0.01,
-            showTrajectories=True,
+            showTrajectories=False,
             TrajectoriesPrecision=0.1,
             TrajectoriesColor=[1,1,0,1],
             ExportPositions=False
@@ -618,8 +618,8 @@ def TDCR(parentNode, name="TDCR",
     c1=loadPointListFromFile("cable1.json")
     c2=loadPointListFromFile("cable2.json")
     c3=loadPointListFromFile("cable3.json")
-    all_points = [c1[-1], c2[-1], c3[-1]]
-    # all_points = c1 + c2 + c3
+    # all_points = [c1[-1], c2[-1], c3[-1]]
+    all_points = c1 + c2 + c3
     # coords = [c1,c2,c3]   #points
     coords = [
         (17.5, 110, 7.5),    # ROI 1 center
