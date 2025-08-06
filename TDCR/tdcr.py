@@ -17,8 +17,11 @@ from collections import defaultdict
 import numpy as np
 import threading
 import time
-
 import math
+
+def test():
+    """Test function to check if the module is loaded correctly."""
+    print("TDCR module loaded successfully.")
 
 def virtual_tendon_lengths(DeltaLv, alpha_deg):
     """
