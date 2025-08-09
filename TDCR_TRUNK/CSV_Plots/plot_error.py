@@ -3,144 +3,117 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, Bounds
 
-plt.rcParams['font.family'] = 'serif'
-plt.rcParams['font.serif'] = ['cmr10']
+# ---------- Matplotlib global styling ----------
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"]  = ["cmr10"]
 plt.rcParams["axes.formatter.use_mathtext"] = True
 
-# --- Load data ---
-df_spine = pd.read_csv('tdcr_trunk_spine.csv')
-x_cols_spine = [col for col in df_spine.columns if col.startswith('x')]
-y_cols_spine = [col for col in df_spine.columns if col.startswith('y')]
-z_cols_spine = [col for col in df_spine.columns if col.startswith('z')]
+# ---------- Size controls ----------
+BASE_FONTSIZE = 40          # ❶ bigger fonts
+LINEW         = 10           # ❷ thicker lines
+MARKERSZ      = 10           # ❸ larger points
 
-def fit_plane(points):
-    centroid = np.mean(points, axis=0)
-    _, _, vh = np.linalg.svd(points - centroid)
-    normal = vh[2, :]
-    e1 = vh[0, :]
-    e2 = vh[1, :]
-    return centroid, normal, e1, e2
+plt.rcParams.update({
+    "axes.titlesize":   BASE_FONTSIZE + 2,
+    "axes.labelsize":   BASE_FONTSIZE,
+    "xtick.labelsize":  BASE_FONTSIZE - 2,
+    "ytick.labelsize":  BASE_FONTSIZE - 2,
+    "legend.fontsize":  BASE_FONTSIZE - 2,
+    "figure.titlesize": BASE_FONTSIZE + 4
+})
 
-def project_to_plane(points, origin, e1, e2):
-    rel = points - origin
-    x = np.dot(rel, e1)
-    y = np.dot(rel, e2)
-    return np.stack([x, y], axis=1)
+# ---------- Load data ----------
+df_spine = pd.read_csv("tdcr_trunk_spine.csv")
+x_cols   = [c for c in df_spine.columns if c.startswith("x")]
+y_cols   = [c for c in df_spine.columns if c.startswith("y")]
+z_cols   = [c for c in df_spine.columns if c.startswith("z")]
+
+# ---------- Helper functions ----------
+def fit_plane(pts):
+    centroid = np.mean(pts, axis=0)
+    _, _, vh = np.linalg.svd(pts - centroid)
+    return centroid, vh[2], vh[0], vh[1]
+
+def project_to_plane(pts, origin, e1, e2):
+    rel = pts - origin
+    return np.column_stack([rel @ e1, rel @ e2])
 
 def safe_exp(x):
-    x = np.clip(x, -20, 20)
-    return np.exp(x)
+    return np.exp(np.clip(x, -20, 20))
 
-def fit_log_spiral_explicit(x, y, maxiter=5000):
-    x = np.asarray(x)
-    y = np.asarray(y)
-    if len(x) < 5:
-        return np.nan, np.nan, np.nan, np.nan, np.nan
-    x0_init = np.mean(x)
-    y0_init = np.mean(y)
-    theta = np.unwrap(np.arctan2(y - y0_init, x - x0_init))
-    r = np.sqrt((x - x0_init)**2 + (y - y0_init)**2)
-    r[r <= 0] = 1e-6
-    p = np.polyfit(theta, np.log(r + 1e-12), 1)
-    a0 = np.exp(p[1])
-    b0 = p[0]
-    theta0 = 0.0
-    params0 = [x0_init, y0_init, np.log(a0), b0, theta0]
-    min_x, max_x = np.min(x), np.max(x)
-    min_y, max_y = np.min(y), np.max(y)
-    bounds = Bounds(
-        [min_x, min_y, -10, -2, -2*np.pi],
-        [max_x, max_y, 10, 2, 2*np.pi]
-    )
-    def spiral_cost(params):
-        x0, y0, loga, b, theta_off = params
-        theta_data = np.unwrap(np.arctan2(y - y0, x - x0))
-        r_data = np.sqrt((x - x0)**2 + (y - y0)**2)
-        model_log_r = loga + b * (theta_data + theta_off)
-        return np.sum((np.log(r_data + 1e-12) - model_log_r)**2)
-    res = minimize(
-        spiral_cost, params0, method='L-BFGS-B', bounds=bounds,
-        options={'maxiter': maxiter}
-    )
-    x0_fit, y0_fit, loga_fit, b_fit, theta_off_fit = res.x
-    a_fit = np.exp(np.clip(loga_fit, -20, 20))
-    return x0_fit, y0_fit, a_fit, b_fit, theta_off_fit
+def fit_log_spiral_explicit(x, y, maxiter=5_000):
+    if x.size < 5: return [np.nan]*5
+    x0, y0 = np.mean(x), np.mean(y)
+    theta  = np.unwrap(np.arctan2(y - y0, x - x0))
+    r      = np.hypot(x - x0, y - y0).clip(min=1e-6)
+    p      = np.polyfit(theta, np.log(r), 1)
+    params0 = [x0, y0, np.log(np.exp(p[1])), p[0], 0.0]
+    bnds = Bounds([x.min(), y.min(), -10, -2, -2*np.pi],
+                  [x.max(), y.max(),  10,  2,  2*np.pi])
+    def cost(p):
+        x0, y0, loga, b, t_off = p
+        td = np.unwrap(np.arctan2(y - y0, x - x0))
+        rd = np.hypot(x - x0, y - y0)
+        return ((np.log(rd) - (loga + b*(td + t_off)))**2).sum()
+    res = minimize(cost, params0, method="L-BFGS-B",
+                   bounds=bnds, options={"maxiter": maxiter})
+    x0f, y0f, loga, b, t_off = res.x
+    return x0f, y0f, safe_exp(loga), b, t_off
 
-def calculate_rms_percent_error(x, y, x0, y0, a, b, theta_off):
-    theta_data = np.unwrap(np.arctan2(y - y0, x - x0))
-    r_data = np.sqrt((x - x0)**2 + (y - y0)**2)
-    r_model = a * safe_exp(b * (theta_data + theta_off))
-    rms = np.sqrt(np.mean((r_data - r_model)**2))
-    mean_radius = np.mean(r_data)
-    if mean_radius < 1e-8:
-        return np.nan
-    return 100 * rms / mean_radius
+def rms_percent_error(x, y, x0, y0, a, b, t_off):
+    theta = np.unwrap(np.arctan2(y - y0, x - x0))
+    r     = np.hypot(x - x0, y - y0)
+    model = a * safe_exp(b*(theta + t_off))
+    mean_r = r.mean()
+    return np.nan if mean_r < 1e-8 else 100*np.sqrt(((r - model)**2).mean())/mean_r
 
-def is_straight(points_2d, angle_thresh=0.5, svd_ratio_thresh=20):
-    points_centered = points_2d - np.mean(points_2d, axis=0)
-    u, s, vh = np.linalg.svd(points_centered)
-    svd_ratio = s[0] / (s[1] + 1e-8)
-    centroid = np.mean(points_2d, axis=0)
-    thetas = np.arctan2(points_2d[:,1] - centroid[1], points_2d[:,0] - centroid[0])
-    angle_span = np.max(thetas) - np.min(thetas)
-    return svd_ratio > svd_ratio_thresh or angle_span < angle_thresh
+def is_straight(pts2d, ang_thresh=0.5, svd_ratio=20):
+    pts_c = pts2d - pts2d.mean(axis=0)
+    _, s, _ = np.linalg.svd(pts_c)
+    if s[1] == 0: return True
+    ratio   = s[0]/s[1]
+    ang_span= np.ptp(np.arctan2(pts2d[:,1]-pts2d[:,1].mean(),
+                                pts2d[:,0]-pts2d[:,0].mean()))
+    return ratio > svd_ratio or ang_span < ang_thresh
 
-# --- Compute error for all frames ---
-all_rms_errors = []
-L1_disp = []
-for row_idx in range(len(df_spine)):
-    xs_spine = df_spine.loc[row_idx, x_cols_spine].values
-    ys_spine = df_spine.loc[row_idx, y_cols_spine].values
-    zs_spine = df_spine.loc[row_idx, z_cols_spine].values
-    points_spine = np.vstack([xs_spine, ys_spine, zs_spine]).T
-    centroid, normal, e1, e2 = fit_plane(points_spine)
-    points_2d = project_to_plane(points_spine, centroid, e1, e2)
-    if is_straight(points_2d):
-        all_rms_errors.append(0.0)
+# ---------- Core processing ----------
+all_rms, disp = [], []
+for idx in range(len(df_spine)):
+    xs, ys, zs = [df_spine.loc[idx, cols].values for cols in (x_cols, y_cols, z_cols)]
+    pts        = np.column_stack([xs, ys, zs])
+    centroid, _, e1, e2 = fit_plane(pts)
+    pts2d = project_to_plane(pts, centroid, e1, e2)
+    if is_straight(pts2d):
+        all_rms.append(0.0)
     else:
-        x = points_2d[:, 0]
-        y = points_2d[:, 1]
-        x0, y0, a, b, theta_off = fit_log_spiral_explicit(x, y)
-        if not (np.isnan(a) or np.isinf(a) or np.isnan(b) or np.isinf(b)):
-            percent_error = calculate_rms_percent_error(x, y, x0, y0, a, b, theta_off)
-        else:
-            percent_error = np.nan
-        all_rms_errors.append(percent_error)
-    # Cable displacement (L1)
-    if 'L1' in df_spine.columns:
-        L1 = df_spine.loc[row_idx, 'L1']
-    else:
-        L1 = row_idx
-    L1_disp.append(L1)
+        x, y = pts2d[:,0], pts2d[:,1]
+        parms = fit_log_spiral_explicit(x, y)
+        all_rms.append(rms_percent_error(x, y, *parms))
+    disp.append(df_spine.loc[idx, "L1"] if "L1" in df_spine else idx)
 
-all_rms_errors = np.array(all_rms_errors)
-L1_disp = np.array(L1_disp)
+all_rms = np.asarray(all_rms)
+disp    = np.asarray(disp)
+diff    = np.gradient(all_rms)
 
-# --- Compute differentiation (finite difference) curve ---
-diff_curve = np.gradient(all_rms_errors)
+# ---------- Plot ----------
+START = 0
+mask  = np.abs(diff[START:]) <= 0.01
 
-# --- Only plot from a given frame onward ---
-start_idx = 300 # 0-based index for 300th frame; edit this value to change starting frame
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.plot(disp[START:][mask], all_rms[START:][mask],
+        "o-", color="royalblue", linewidth=LINEW,
+        markersize=MARKERSZ, label="RMS % Error")
+# ax.plot(disp[START:][mask], diff[START:][mask], "-", color="firebrick",
+#         linewidth=LINEW, label="d(Error)/dFrame")
+ax.axhline(15, color="firebrick", linestyle="--",
+           linewidth=LINEW-2, label="15% threshold")
 
-# --- Mask out points where differentiation > 5 ---
-mask = np.abs(diff_curve[start_idx:]) <= 0.01
+ax.set_xlabel("Cable Displacement", fontsize=BASE_FONTSIZE)
+ax.set_ylabel("Value(%)",             fontsize=BASE_FONTSIZE)
+ax.set_title("RMS Error (%)",      fontsize=BASE_FONTSIZE + 2)
 
-plt.figure(figsize=(6, 6))
-plt.plot(
-    L1_disp[start_idx:][mask],
-    all_rms_errors[start_idx:][mask],
-    'bo-', linewidth=2, markersize=2, label='RMS % Error'
-)
-plt.plot(
-    L1_disp[start_idx:][mask],
-    diff_curve[start_idx:][mask],
-    'r-', linewidth=2, label='d(Error)/dFrame'
-)
-plt.axhline(15, color='gray', linestyle='--', linewidth=1, label='15% threshold')
-plt.xlabel('Cable Displacement (L1)', fontsize=14)
-plt.ylabel('Value', fontsize=14)
-plt.title(f'RMS Error (%)', fontsize=15)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
+ax.tick_params(labelsize=BASE_FONTSIZE)
+ax.grid(True, which="both", linestyle=":")
+ax.legend()
+fig.tight_layout()
 plt.show()

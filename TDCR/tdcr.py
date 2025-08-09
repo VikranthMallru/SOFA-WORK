@@ -388,10 +388,10 @@ class TDCRController(Sofa.Core.Controller):
         elif key in self.release_keys:
             idx = self.release_keys[key]
             self._adjust_cable(idx, -self.displacement_step)
-            if key == "!" or self.cables[0].CableConstraint.value[0] <= 0:
-                self._adjust_cable(0, -self.displacement_step)
-                self._adjust_cable(1, self.displacement_step)
-                self._adjust_cable(2, self.displacement_step)
+            # if key == "!" or self.cables[0].CableConstraint.value[0] <= 0:
+            #     self._adjust_cable(0, -self.displacement_step)
+            #     self._adjust_cable(1, self.displacement_step)
+            #     self._adjust_cable(2, self.displacement_step)
                 
         elif key == "4":
             for idx in range(3):
@@ -405,14 +405,14 @@ class TDCRController(Sofa.Core.Controller):
 
 
         # Call the new function for ROI extraction and CSV logging
-        if key != "4" and key != "$":
-            log_roi_csv(self.csv_file,
+        # if key != "4" and key != "$":
+        log_roi_csv(self.csv_file,
                     self.cables,
                     self.roi_nodes,
                     self.soft_body_node,
                     printInTerminal=0
                     )
-            spine_log_roi_csv(
+        spine_log_roi_csv(
             self.cables,
             self.roi_nodes,
             self.soft_body_node,
@@ -424,8 +424,8 @@ class TDCRController(Sofa.Core.Controller):
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
             DeltaLv = 50.0
             alpha_deg = 0.0
-            steps =(int) (1.0 * DeltaLv) 
-            interval = 0.5
+            steps =(int) (10.0 * DeltaLv) 
+            interval = 0.1
             step_size = DeltaLv / steps
             self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
         
@@ -530,6 +530,7 @@ class TDCRController(Sofa.Core.Controller):
            z1 = x0 * s + z0 * c
            rotated.append([x1 + cx, y, z1 + cz])
        return rotated
+    
     def virtual_tendon_stepper(self, DeltaLv, alpha_deg, step_size, interval, steps):
         """
         Moves cables in virtual tendon direction in steps.

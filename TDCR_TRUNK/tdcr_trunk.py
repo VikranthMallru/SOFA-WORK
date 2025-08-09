@@ -46,10 +46,11 @@ def add_monitors_to_rois(roi_nodes):
                       showPositions=False,
                       PositionsColor=[1.0, 0.0, 0.0, 1.0],
                       showMinThreshold=0.01,
-                      showTrajectories=False,
+                      showTrajectories=True,
                       TrajectoriesPrecision=0.1,
-                      TrajectoriesColor=[1,1,0,1],
+                      TrajectoriesColor=[0.0, 0.25, 0.7, 1.0],  # Bright navy blue
                       ExportPositions=False)
+
 
 def rotate_cable_points(points, deg, center=(19.75,0,19.75)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
@@ -281,7 +282,7 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         # Automated movement: step to goal for all cables
         elif key == "0":
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
-            self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.5,goals= [200.0, 0,0])
+            self.cable_stepper_to_goal(step_sizes=[0.5, 0,0],interval= 0.5,goals= [200.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
@@ -410,6 +411,7 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     cable3.CableConstraint.maxForce = maxForce
     
     roi_centers = c1_r + c2_r + c3_r
+    # roi_centers = [c1_r[-1]]
     epsilons = [5.0] * len(roi_centers)
     roi_boxes = make_roi_boxes(roi_centers, epsilons)
     roi_nodes = add_boxrois(soft_body, roi_boxes)

@@ -36,7 +36,7 @@ x_center = (x_max + x_min) / 2
 y_center = (y_max + y_min) / 2
 z_center = (z_max + z_min) / 2
 
-margin = 0.56  # 20% margin
+margin = 0.1  # margin
 x_lim = [x_center - max_range/2 - margin*max_range, x_center + max_range/2 + margin*max_range]
 y_lim = [y_center - max_range/2 - margin*max_range, y_center + max_range/2 + margin*max_range]
 z_lim = [z_center - max_range/2 - margin*max_range, z_center + max_range/2 + margin*max_range]
@@ -207,11 +207,15 @@ def plot_row(row_idx):
 
 
     f = 14
-    ax.set_xlabel('X', fontsize=f)
-    ax.set_ylabel('Y', fontsize=f)
-    ax.set_zlabel('Z', fontsize=f)
-    ax.tick_params(axis='both', which='major', labelsize=16)
+    lp = 20
+    ax.set_xlabel('X', fontsize=f, labelpad=lp)
+    ax.set_ylabel('Y', fontsize=f, labelpad=lp)
+    ax.set_zlabel('Z', fontsize=f, labelpad=lp)
+    ax.tick_params(axis='both', which='major', labelsize=20)
     ax.tick_params(axis='both', which='minor', labelsize=14)
+    ax.tick_params(axis='x', pad=10)
+    ax.tick_params(axis='y', pad=10)
+    ax.tick_params(axis='z', pad=10)
     ax.set_title(
         f'{radius_label}: {radius_or_length:.4f} ; '
         f'Total Error: {total_error:.4f} ; Percent Error: {percent_error:.2f}%',
