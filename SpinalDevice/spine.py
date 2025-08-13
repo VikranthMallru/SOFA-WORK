@@ -26,7 +26,7 @@ def add_boxrois(parent_node, roi_boxes):
                      name=f"spinal_roi_{idx+1}",
                      template="Vec3d",
                      box=box,
-                     drawBoxes=True,
+                     drawBoxes=False,
                      doUpdate=True,
                      strict=False)
         roi_nodes.append(roi)
@@ -43,7 +43,7 @@ def add_monitors_to_rois(roi_nodes):
                      showPositions=True,
                      PositionsColor=[0.0, 1.0, 0.0, 1.0],  # Green for spinal monitoring
                      showMinThreshold=0.01,
-                     showTrajectories=True,
+                     showTrajectories=False,
                      TrajectoriesPrecision=0.1,
                      TrajectoriesColor=[0,1,1,1],
                      ExportPositions=True)
@@ -145,12 +145,21 @@ class SpinalAssistiveController(Sofa.Core.Controller):
         current_disp = self.tendons[idx].CableConstraint.value[0]
         new_disp = max(0, current_disp + delta)
         self.tendons[idx].CableConstraint.value = [new_disp]
-
+# [50,-160,80,-50,-180,-50]
+# Utility function to compute box coordinates from a center and epsilon
+def compute_box_from_center(center, epsilon):
+    x, y, z = center
+    return [x - epsilon, y - epsilon, z - epsilon, x + epsilon, y + epsilon, z + epsilon]
+# [40,-180,15]
+# [40,-180,-15]
+# [-40,-180,15]
+# [-40,-180,-15]
 def SpinalAssistiveDevice(parentNode, 
                          name="SpinalAssistive",
                          rotation=[0.0, 0.0, 0.0], 
                          translation=[0.0, 0.0, 0.0],
-                         fixingBox=[50,-160,80,-50,-180,-50],  # Adjust for your spinal device
+                        #  fixingBox=compute_box_from_center([-40,-180,-15],1),  # Adjust for your spinal device
+                        fixingBox=[50, -160, 80, -50, -200, -50],  # Adjust for your spinal device
                          minForce=-sys.float_info.max, 
                          maxForce=sys.float_info.max,
                          volume_mesh="spinal_volume.vtk",      # Your spinal device mesh
