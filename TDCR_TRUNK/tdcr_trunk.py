@@ -46,13 +46,13 @@ def add_monitors_to_rois(roi_nodes):
                       showPositions=False,
                       PositionsColor=[1.0, 0.0, 0.0, 1.0],
                       showMinThreshold=0.01,
-                      showTrajectories=True,
+                      showTrajectories=False,
                       TrajectoriesPrecision=0.1,
                       TrajectoriesColor=[0.0, 0.25, 0.7, 1.0],  # Bright navy blue
                       ExportPositions=False)
 
 
-def rotate_cable_points(points, deg, center=(19.75,0,19.75)):
+def rotate_cable_points(points, deg, center=(22,0,22)):
        """Rotate a list of [x, y, z] points by deg degrees around the Y axis about center."""
        if deg == 0:
            return [list(pt) for pt in points]
@@ -282,7 +282,7 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         # Automated movement: step to goal for all cables
         elif key == "0":
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
-            self.cable_stepper_to_goal(step_sizes=[0.5, 0,0],interval= 0.5,goals= [200.0, 0,0])
+            self.cable_stepper_to_goal(step_sizes=[0.5, 0,0],interval= 0.1,goals= [170.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
@@ -301,14 +301,15 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
 # fixingBox=[-1,0,-1,51.52,7,51.52]
 
 
-x = 19.75
-y = 272.68
-z = 19.75
+x = 17 
+y = 250
+z = 22
 d = 1  # half the size of the fixing box
 # 19.75 - 5.4 = 14.35
+# [0,-2,1,45,5,45]
 def TDCR_trunk(parentNode, name="TDCR_trunk",
          rotation=[0.0, 0.0, 0.0], translation=[0.0, 0.0, 0.0],
-         fixingBox=[0,-4,0,39.5,10,39.50] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
+         fixingBox=[0,-2,1,45,5,45] , minForce = -sys.float_info.max, maxForce = sys.float_info.max):
 # fixingBox=[-1,-4,-1,41.50,10,41.50] [x-d,y-d,z-d,x+d,y+d,z+d]
     tdcr = parentNode.addChild(name)
 # 

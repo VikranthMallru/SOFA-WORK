@@ -422,7 +422,7 @@ class TDCRController(Sofa.Core.Controller):
         )
         if key == "9":
             # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
-            DeltaLv = 50.0
+            DeltaLv = 80.0
             alpha_deg = 0.0
             steps =(int) (10.0 * DeltaLv) 
             interval = 0.1
