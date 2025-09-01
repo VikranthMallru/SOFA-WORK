@@ -282,7 +282,7 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         # Automated movement: step to goal for all cables
         elif key == "0":
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
-            self.cable_stepper_to_goal(step_sizes=[0.5, 0,0],interval= 0.1,goals= [170.0, 0,0])
+            self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.2,goals= [170.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
