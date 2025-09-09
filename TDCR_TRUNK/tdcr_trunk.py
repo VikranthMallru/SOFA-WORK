@@ -284,14 +284,17 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
             # Example: move all cables to 10.0 in steps of 0.5, interval 0.2s
             self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.2,goals= [170.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
-
+        elif key == "9":
+            log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+            spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+            print("\n[Logged current state to CSV files.]\n")
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
         force_values = [c.CableConstraint.force.value for c in self.cables]
         print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
 
-        log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
-        spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+        # log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+        # spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
 
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
