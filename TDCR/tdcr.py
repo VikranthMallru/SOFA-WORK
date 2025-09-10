@@ -398,10 +398,25 @@ class TDCRController(Sofa.Core.Controller):
             # Example: move all cables to goals in steps
             self.cable_stepper_to_goal(step_sizes=[0.1, 0, 0], interval=0.2, goals=[170.0, 0, 0])
         elif key == "9":
-            # Set first cable to 0 displacement initially
-            self.cables[0].CableConstraint.value = [0.0]
-            # Start stepping the first cable to 140 with logging every 10mm
-            self.cable_stepper_to_goal_with_log_interval(step_sizes=[0.01, 0, 0], interval=0.01, goals=[70.0, 0, 0], log_interval=10.0)
+            # Reset all cables to 0.0
+            for i in range(3):
+                self.cables[i].CableConstraint.value = [0.0]
+
+            def sequence():
+                self.blocking_cable_stepper_to_goal_with_log_interval(
+                    step_sizes=[0.01, 0.0, 0.0],
+                    interval=0.01,
+                    goals=[70.0, 0.0, 0.0],
+                    log_interval=10.0
+                )
+                # self.blocking_cable_stepper_to_goal_with_log_interval(
+                #     step_sizes=[0.01, 0, 0],
+                #     interval=0.01,
+                #     goals=[70.0, 30.0, 30.0],
+                #     log_interval=10.0
+                # )
+
+            threading.Thread(target=sequence, daemon=True).start()
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
@@ -411,10 +426,12 @@ class TDCRController(Sofa.Core.Controller):
         # log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
         # spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
 
+
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
         new_disp = current_disp + delta
         self.cables[idx].CableConstraint.value = [new_disp]
+
 
     def cable_stepper_to_goal_with_log_interval(self, step_sizes, interval, goals, log_interval):
         """
@@ -469,6 +486,53 @@ class TDCRController(Sofa.Core.Controller):
                 time.sleep(interval)
         threading.Thread(target=step_loop, daemon=True).start()
 
+
+    def blocking_cable_stepper_to_goal_with_log_interval(self, step_sizes, interval, goals, log_interval):
+        """
+        Blocking version of cable_stepper_to_goal_with_log_interval.
+        """
+        last_logged = 0.0
+
+        # Log initial state
+        log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+        spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+        print("\n[Logged initial state at 0.]\n")
+
+        while True:
+            done = True
+            for idx, (step, goal) in enumerate(zip(step_sizes, goals)):
+                current = self.cables[idx].CableConstraint.value[0]
+                diff = goal - current
+                if abs(diff) > abs(step):
+                    move = step if diff > 0 else -abs(step)
+                    self._adjust_cable(idx, move)
+                    done = False
+                elif abs(diff) > 1e-6:
+                    self._adjust_cable(idx, diff)
+                    done = False  # Set done=False if any adjustment was made
+            current_disp = self.cables[0].CableConstraint.value[0]  # Track first cable
+            # Log only if we've reached or passed the next log_interval
+            if current_disp >= last_logged + log_interval or done:
+                log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                print("\n[Logged state at {:.2f}.]\n".format(current_disp))
+                last_logged = (current_disp // log_interval) * log_interval
+
+            disp_values = [c.CableConstraint.value[0] for c in self.cables]
+            print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+            force_values = [c.CableConstraint.force.value for c in self.cables]
+            print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+            if done:
+                # Ensure final log
+                if abs(current_disp - goals[0]) < 1e-6 and abs(current_disp - last_logged) >= 1e-6:
+                    log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                    spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                    print("\n[Logged final state.]\n")
+                print("Cable stepping to goal finished.")
+                break
+            time.sleep(interval)
+
+
     # Note: The 'cable_stepper_to_goal' method is referenced but not defined in the provided Code 2 snippet.
     # Assuming a similar implementation is needed, you may need to add or adapt it based on context.
     # For completeness, here's a placeholder based on typical stepper logic:
@@ -490,6 +554,7 @@ class TDCRController(Sofa.Core.Controller):
                     break
                 time.sleep(interval)
         threading.Thread(target=step_loop, daemon=True).start()
+
 
 
     def generate_cable_paths(self, theta0):

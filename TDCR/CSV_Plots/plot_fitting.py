@@ -12,7 +12,7 @@ plt.rcParams["axes.formatter.use_mathtext"] = True
 IGNORE_FIRST_N_FRAMES = 0        
 IGNORE_FIRST_X_DISPLACEMENT = 0.0   
 EVERY_N_FRAMES = 1 #min 1
-REFERENCE_FRAME = 0  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
+REFERENCE_FRAME = 4  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
 # ----------------------------------------------------------
 # Load data
 # Using file names from circle fit code
@@ -313,7 +313,7 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
             mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f}')
             high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f}')
             legend_handles = [low, mid, high]
-        deviation_ax.set_xlabel('Point Index', fontsize=24)
+        deviation_ax.set_xlabel('Length', fontsize=24)
         deviation_ax.set_ylabel('Deviation (mm)', fontsize=24)
         deviation_ax.tick_params(axis='both', which='major', labelsize=24)
         deviation_ax.tick_params(axis='both', which='minor', labelsize=18)
@@ -405,12 +405,13 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                 low = mlines.Line2D([], [], color=colors[min_idx], linewidth=2, label=f'Min Disp: {l1_values[min_idx]:.2f}')
                 mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f}')
                 high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f}')
-                main_ax.legend(handles=[low, mid, high], loc='upper left', fontsize=12, title='Tendon Displacement')
+                main_ax.legend(handles=[low, mid, high], loc='upper right', fontsize=12, title='Tendon Displacement')
                 main_ax.set_xlabel('X', fontsize=20)
                 main_ax.set_ylabel('Y', fontsize=20)
                 main_ax.tick_params(axis='both', which='major', labelsize=24)
                 main_ax.tick_params(axis='both', which='minor', labelsize=18)
                 main_ax.set_title('2D Projection and Curve Fitting', fontsize=15)
+                main_ax.set_xlim(-30, main_ax.get_xlim()[1])
             else:
                 # Single frame 2D plot
                 if center is not None and radius != np.inf:

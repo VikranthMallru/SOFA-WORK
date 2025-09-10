@@ -270,10 +270,33 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
             self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.2,goals= [170.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
         elif key == "9":
-            # Set first cable to 0 displacement initially
-            self.cables[0].CableConstraint.value = [0.0]
-            # Start stepping the first cable to 140 with logging every 10mm
-            self.cable_stepper_to_goal_with_log_interval(step_sizes=[0.01, 0, 0], interval=0.01, goals=[140.0, 0, 0], log_interval=10.0)
+            # First target: move all cables from 0,0,0 to 40,40,40 WITHOUT recording
+            for i in range(3):
+                self.cables[i].CableConstraint.value = [0.0]
+            def move_to_first_target():
+                while any(abs(self.cables[i].CableConstraint.value[0] - 40.0) > 1e-3 for i in range(3)):
+                    for idx in range(3):
+                        current = self.cables[idx].CableConstraint.value[0]
+                        diff = 40.0 - current
+                        step = 0.01
+                        if abs(diff) > step:
+                            move = step if diff > 0 else -step
+                            self._adjust_cable(idx, move)
+                        elif abs(diff) > 1e-6:
+                            self._adjust_cable(idx, diff)
+                    time.sleep(0.01)
+                # Now start logging from 40,40,40 to 140,40,40 (only first cable moves)
+                    disp_values = [c.CableConstraint.value[0] for c in self.cables]
+                    print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+                    force_values = [c.CableConstraint.force.value for c in self.cables]
+                    print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+                self.cable_stepper_to_goal_with_log_interval(
+                    step_sizes=[0.01, 0, 0],
+                    interval=0.01,
+                    goals=[140.0, 40.0, 40.0],
+                    log_interval=10.0
+                )
+            threading.Thread(target=move_to_first_target, daemon=True).start()
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
         force_values = [c.CableConstraint.force.value for c in self.cables]

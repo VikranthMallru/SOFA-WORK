@@ -10,12 +10,17 @@ from matplotlib import cm  # Added for colormaps
 
 
 
+
+
 # ------- CONFIG: Edit these to control frame skipping -------
 IGNORE_FIRST_N_FRAMES = 0        
 IGNORE_FIRST_X_DISPLACEMENT = 4.0   
 EVERY_N_FRAMES = 1 #min 1
 REFERENCE_FRAME = 0  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
+IGNORE_FRAMES = [0,1,2,3,7]  # Add specific frame numbers (actual indices) to ignore, e.g., [10, 25, 50]
 # ----------------------------------------------------------
+
+
 
 
 
@@ -233,6 +238,9 @@ def calculate_displacement(points):
     return np.max(distances)
 # NEW: Function to determine if a frame should be considered
 def should_consider_frame(frame_idx):
+    actual_frame = frame_idx + IGNORE_FIRST_N_FRAMES
+    if actual_frame in IGNORE_FRAMES:
+        return False
     return (frame_idx % EVERY_N_FRAMES) == 0
 # NEW: Precompute all spiral fits for every Nth frame to make GUI faster (lookup only)
 print("Precomputing spiral fits for every Nth frame... This may take a moment.")
@@ -256,6 +264,8 @@ slider = Slider(slider_ax, 'Frame Slider', 1, len(considered_frames), valinit=1,
 slider.label.set_fontsize(16)
 
 
+
+
 # Group 1: Display Elements
 display_ax = plt.axes([0.85, 0.65, 0.13, 0.15])  # Shifted right
 display_labels = ['Spine', 'ROI_Points', 'Show Spiral']
@@ -264,6 +274,8 @@ display_check = CheckButtons(display_ax, display_labels, display_vals)
 for text in display_check.labels:
     text.set_fontsize(12)
 fig.text(0.85, 0.80, 'Display', fontsize=14, fontweight='bold')
+
+
 
 
 # Group 2: View Modes
@@ -276,6 +288,8 @@ for text in modes_check.labels:
 fig.text(0.85, 0.60, 'Modes', fontsize=14, fontweight='bold')
 
 
+
+
 # Group 3: Multi-Frame Options
 multi_ax = plt.axes([0.85, 0.35, 0.13, 0.15])  # Shifted right
 multi_labels = ['Show All Frames', 'Show All in 2D', 'Show Average']
@@ -286,6 +300,8 @@ for text in multi_check.labels:
 fig.text(0.85, 0.50, 'Multi-Frame', fontsize=14, fontweight='bold')
 
 
+
+
 # Group 4: 2D Options
 options_ax = plt.axes([0.85, 0.25, 0.13, 0.05])  # Shifted right
 options_labels = ['Transform 2D']
@@ -294,6 +310,8 @@ options_check = CheckButtons(options_ax, options_labels, options_vals)
 for text in options_check.labels:
     text.set_fontsize(12)
 fig.text(0.85, 0.30, '2D Options', fontsize=14, fontweight='bold')
+
+
 
 
 legend_ax = plt.axes([0.85, 0.85, 0.13, 0.15])  # Shifted right
@@ -340,7 +358,9 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
     if deviation_plot_mode:
         legend_handles = []
         
-        # Calculate average data if needed
+        # Calculate average data if needed (but plot later)
+        avg_deviations = None
+        point_indices_avg = None
         if show_average:
             all_deviations = []
             max_points = 0
@@ -374,11 +394,27 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             avg_deviations = np.nanmean(padded_deviations, axis=0)
             point_indices_avg = np.arange(int(IGNORE_FIRST_X_DISPLACEMENT), int(IGNORE_FIRST_X_DISPLACEMENT) + len(avg_deviations))
         
-        # Plot all individual frames with unique colors and labels based on L1
+        # Plot all individual frames with unique colors
         if show_all_deviations:
             num_frames = len(considered_frames)
             colors = cm.viridis(np.linspace(0, 1, num_frames))
             alpha_val = 0.3 if show_average else 1.0  # Translucent when average is shown
+            
+            # Get L1 values for min, mid, max disp
+            l1_values = np.array([df_spine.loc[i + IGNORE_FIRST_N_FRAMES, 'L1'] for i in considered_frames])
+            min_disp_idx = np.argmin(l1_values)
+            mid_disp_idx = len(l1_values) // 2
+            max_disp_idx = np.argmax(l1_values)
+            min_disp = l1_values[min_disp_idx]
+            mid_disp = l1_values[mid_disp_idx]
+            max_disp = l1_values[max_disp_idx]
+            
+            # Create legend handles for min, mid, max
+            min_handle = mlines.Line2D([], [], color=colors[min_disp_idx], linewidth=2, label=f'Min Disp: {min_disp:.2f} mm')
+            mid_handle = mlines.Line2D([], [], color=colors[mid_disp_idx], linewidth=2, label=f'Mid Disp: {mid_disp:.2f} mm')
+            max_handle = mlines.Line2D([], [], color=colors[max_disp_idx], linewidth=2, label=f'Max Disp: {max_disp:.2f} mm')
+            legend_handles.extend([min_handle, mid_handle, max_handle])
+            
             for j, i in enumerate(considered_frames):
                 actual_i = i + IGNORE_FIRST_N_FRAMES
                 x0_i, y0_i, a_i, b_i, theta_off_i = fit_log_spiral_explicit_cached(i)
@@ -397,16 +433,7 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
                 filter_idx = int(IGNORE_FIRST_X_DISPLACEMENT)
                 filtered_indices_i = point_indices_i[filter_idx:]
                 filtered_distances_i = distances_i[filter_idx:]
-                # Get L1 value (assuming 'L1' column exists in df_spine)
-                l1_value = df_spine.loc[actual_i, 'L1']
-                line, = deviation_ax.plot(filtered_indices_i, filtered_distances_i, color=colors[j], alpha=alpha_val, linewidth=2, label=f"Tendon Displacement: {l1_value:.2f} mm")
-                legend_handles.append(line)
-        
-        # Plot average line on top
-        if show_average:
-            avg_color = 'r' if show_all_deviations else 'tab:blue'
-            avg_line, = deviation_ax.plot(point_indices_avg, avg_deviations, avg_color + '-', linewidth=5, label='Average Deviation')
-            legend_handles.append(avg_line)
+                deviation_ax.plot(filtered_indices_i, filtered_distances_i, color=colors[j], alpha=alpha_val, linewidth=2)
         
         # Plot single frame if neither is selected
         if not show_all_deviations and not show_average:
@@ -426,6 +453,12 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             l1_value = df_spine.loc[actual_idx, 'L1']
             single_line, = deviation_ax.plot(filtered_indices, filtered_distances, 'b-o', linewidth=2, label=f"Tendon Displacement: {l1_value:.2f} mm")
             legend_handles.append(single_line)
+        
+        # Now plot the average line on top if enabled
+        if show_average:
+            avg_color = 'r' if show_all_deviations else 'tab:blue'
+            avg_line, = deviation_ax.plot(point_indices_avg, avg_deviations, avg_color + '-', linewidth=5, label='Average Deviation')
+            legend_handles.append(avg_line)
         
         deviation_ax.set_xlabel('Length (cm)', fontsize=24)
         deviation_ax.set_ylabel('Deviation (mm)', fontsize=24)
@@ -665,11 +698,15 @@ def toggle_visibility(label):
     update(None)
 
 
+
+
 display_check.on_clicked(toggle_visibility)
 modes_check.on_clicked(toggle_visibility)
 multi_check.on_clicked(toggle_visibility)
 options_check.on_clicked(toggle_visibility)
 slider.on_changed(update)
+
+
 
 
 # Initial plot with new parameter
