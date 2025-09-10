@@ -4,15 +4,20 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, CheckButtons
 from scipy.optimize import minimize, Bounds, differential_evolution
 import matplotlib.lines as mlines  # Added for custom legend handle
+from matplotlib import cm  # Added for colormaps
+
+
 
 
 
 # ------- CONFIG: Edit these to control frame skipping -------
-IGNORE_FIRST_N_FRAMES = 2        
+IGNORE_FIRST_N_FRAMES = 0        
 IGNORE_FIRST_X_DISPLACEMENT = 4.0   
 EVERY_N_FRAMES = 1 #min 1
 REFERENCE_FRAME = 0  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
 # ----------------------------------------------------------
+
+
 
 
 
@@ -85,6 +90,8 @@ avg_points = np.array(avg_points)
 ref_centroid, ref_normal, ref_e1, ref_e2 = fit_plane(avg_points)
 x2d_lim = (-150, 150)
 y2d_lim = (-150, 150)
+transform_x_lim_single = (-5, 105)
+transform_x_lim_all = (-10, 110)
 def safe_exp(x):
     x = np.clip(x, -20, 20)
     return np.exp(x)
@@ -221,7 +228,7 @@ def calculate_displacement(points):
     if len(ref_points) != len(curr_points):
         return 0
     
-    diffs = curr_points - ref_points
+    diffs = points - ref_points
     distances = np.linalg.norm(diffs, axis=1)
     return np.max(distances)
 # NEW: Function to determine if a frame should be considered
@@ -240,26 +247,61 @@ print("Precomputation complete. Starting GUI...")
 # Create figure with adjusted positioning
 fig = plt.figure(figsize=(10, 8))
 main_ax = fig.add_subplot(111, projection='3d')
-# Fixed UI positioning to prevent overlapping
-plt.subplots_adjust(left=0.05, right=0.85, bottom=0.25, top=0.85)  # Increased bottom margin
-deviation_ax = fig.add_axes([0.1, 0.15, 0.75, 0.65])  # Moved up and made smaller
+# Fixed UI positioning to prevent overlapping, increased distance
+plt.subplots_adjust(left=0.15, right=0.80, bottom=0.25, top=0.85)  # Increased left margin to shift graph right
+deviation_ax = fig.add_axes([0.15, 0.15, 0.65, 0.65])  # Adjusted to shift right
 deviation_ax.set_visible(False)
 slider_ax = fig.add_axes([0.2, 0.08, 0.5, 0.03])  # Moved slider up
 slider = Slider(slider_ax, 'Frame Slider', 1, len(considered_frames), valinit=1, valstep=1)
 slider.label.set_fontsize(16)
-check_ax = plt.axes([0.85, 0.3, 0.13, 0.4])
-# Added new "Show Average" toggle
-check_labels = ['Spine', 'ROI_Points', '2D Mode', 'Show Spiral', 'Deviation Plot Mode', 'Show All Frames', 'Show Average']
-check_vals = [True, True, False, True, False, False, False]
-check = CheckButtons(check_ax, check_labels, check_vals)
-for text in check.labels:
+
+
+# Group 1: Display Elements
+display_ax = plt.axes([0.85, 0.65, 0.13, 0.15])  # Shifted right
+display_labels = ['Spine', 'ROI_Points', 'Show Spiral']
+display_vals = [True, True, True]
+display_check = CheckButtons(display_ax, display_labels, display_vals)
+for text in display_check.labels:
     text.set_fontsize(12)
-legend_ax = plt.axes([0.85, 0.75, 0.13, 0.15])
+fig.text(0.85, 0.80, 'Display', fontsize=14, fontweight='bold')
+
+
+# Group 2: View Modes
+modes_ax = plt.axes([0.85, 0.50, 0.13, 0.10])  # Shifted right
+modes_labels = ['2D Mode', 'Deviation Plot Mode']
+modes_vals = [False, False]
+modes_check = CheckButtons(modes_ax, modes_labels, modes_vals)
+for text in modes_check.labels:
+    text.set_fontsize(12)
+fig.text(0.85, 0.60, 'Modes', fontsize=14, fontweight='bold')
+
+
+# Group 3: Multi-Frame Options
+multi_ax = plt.axes([0.85, 0.35, 0.13, 0.15])  # Shifted right
+multi_labels = ['Show All Frames', 'Show All in 2D', 'Show Average']
+multi_vals = [False, False, False]
+multi_check = CheckButtons(multi_ax, multi_labels, multi_vals)
+for text in multi_check.labels:
+    text.set_fontsize(12)
+fig.text(0.85, 0.50, 'Multi-Frame', fontsize=14, fontweight='bold')
+
+
+# Group 4: 2D Options
+options_ax = plt.axes([0.85, 0.25, 0.13, 0.05])  # Shifted right
+options_labels = ['Transform 2D']
+options_vals = [False]
+options_check = CheckButtons(options_ax, options_labels, options_vals)
+for text in options_check.labels:
+    text.set_fontsize(12)
+fig.text(0.85, 0.30, '2D Options', fontsize=14, fontweight='bold')
+
+
+legend_ax = plt.axes([0.85, 0.85, 0.13, 0.15])  # Shifted right
 legend_ax.axis('off')
 spine_scatter = None
 tdcr_scatter = None
 spiral_line = None
-def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average):
+def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform):
     global spine_scatter, tdcr_scatter, spiral_line, main_ax, deviation_ax, legend_ax
     
     legend_ax.clear()
@@ -294,7 +336,6 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
     ys_tdcr = df_tdcr.loc[actual_idx, y_cols_tdcr].values
     zs_tdcr = df_tdcr.loc[actual_idx, z_cols_tdcr].values
     points_tdcr = np.vstack([xs_tdcr, ys_tdcr, zs_tdcr]).T
-    status = check.get_status()
     
     if deviation_plot_mode:
         legend_handles = []
@@ -333,11 +374,12 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             avg_deviations = np.nanmean(padded_deviations, axis=0)
             point_indices_avg = np.arange(int(IGNORE_FIRST_X_DISPLACEMENT), int(IGNORE_FIRST_X_DISPLACEMENT) + len(avg_deviations))
         
-        # Plot all individual frames
+        # Plot all individual frames with unique colors and labels based on L1
         if show_all_deviations:
-            fixed_color = 'tab:blue'
-            alpha_val = 0.3 if show_average else 1.0
-            for i in considered_frames:
+            num_frames = len(considered_frames)
+            colors = cm.viridis(np.linspace(0, 1, num_frames))
+            alpha_val = 0.3 if show_average else 1.0  # Translucent when average is shown
+            for j, i in enumerate(considered_frames):
                 actual_i = i + IGNORE_FIRST_N_FRAMES
                 x0_i, y0_i, a_i, b_i, theta_off_i = fit_log_spiral_explicit_cached(i)
                 xs_spine_i = df_spine.loc[actual_i, x_cols_spine].values
@@ -355,22 +397,16 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
                 filter_idx = int(IGNORE_FIRST_X_DISPLACEMENT)
                 filtered_indices_i = point_indices_i[filter_idx:]
                 filtered_distances_i = distances_i[filter_idx:]
-                deviation_ax.plot(filtered_indices_i, filtered_distances_i, color=fixed_color, alpha=alpha_val, linewidth=2)
-            
-            # Add single blue legend entry
-            blue_line = mlines.Line2D([], [], color=fixed_color, label='Deviation over length', linewidth=2)
-            legend_handles.append(blue_line)
+                # Get L1 value (assuming 'L1' column exists in df_spine)
+                l1_value = df_spine.loc[actual_i, 'L1']
+                line, = deviation_ax.plot(filtered_indices_i, filtered_distances_i, color=colors[j], alpha=alpha_val, linewidth=2, label=f"Tendon Displacement: {l1_value:.2f} mm")
+                legend_handles.append(line)
         
         # Plot average line on top
         if show_average:
             avg_color = 'r' if show_all_deviations else 'tab:blue'
-            deviation_ax.plot(point_indices_avg, avg_deviations, avg_color + '-', linewidth=5)
-            if show_all_deviations:
-                red_line = mlines.Line2D([], [], color='r', label='Average Deviation', linewidth=5)
-                legend_handles.append(red_line)
-            else:
-                blue_line = mlines.Line2D([], [], color='tab:blue', label='Deviation over length', linewidth=2)
-                legend_handles.append(blue_line)
+            avg_line, = deviation_ax.plot(point_indices_avg, avg_deviations, avg_color + '-', linewidth=5, label='Average Deviation')
+            legend_handles.append(avg_line)
         
         # Plot single frame if neither is selected
         if not show_all_deviations and not show_average:
@@ -386,16 +422,17 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             filter_idx = int(IGNORE_FIRST_X_DISPLACEMENT)
             filtered_indices = point_indices[filter_idx:]
             filtered_distances = distances[filter_idx:]
-            deviation_ax.plot(filtered_indices, filtered_distances, 'b-o', linewidth=2)
-            blue_line = mlines.Line2D([], [], color='b', label='Deviation over length', linewidth=2)
-            legend_handles.append(blue_line)
+            # Get L1 for single frame
+            l1_value = df_spine.loc[actual_idx, 'L1']
+            single_line, = deviation_ax.plot(filtered_indices, filtered_distances, 'b-o', linewidth=2, label=f"Tendon Displacement: {l1_value:.2f} mm")
+            legend_handles.append(single_line)
         
-        deviation_ax.set_xlabel('Distance from Base (cm)', fontsize=24)
+        deviation_ax.set_xlabel('Length (cm)', fontsize=24)
         deviation_ax.set_ylabel('Deviation (mm)', fontsize=24)
         deviation_ax.tick_params(axis='both', which='major', labelsize=24)
         deviation_ax.tick_params(axis='both', which='minor', labelsize=18)
         deviation_ax.grid(True)
-        deviation_ax.set_ylim(0, 70)
+        deviation_ax.set_ylim(0, 30)  # Updated y-axis limit
         
         if show_average and show_all_deviations:
             deviation_ax.set_title('Deviation Plot', fontsize=20)
@@ -407,40 +444,157 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             deviation_ax.set_title(f'Deviation Plot - Frame {actual_idx + 1} ', fontsize=20)
         
         if legend_handles:
-            deviation_ax.legend(handles=legend_handles, fontsize=12)
+            deviation_ax.legend(handles=legend_handles, fontsize=12, loc='upper left')  # Increased font size for bigger legend
     else:
         if mode_2d:
             if main_ax.name == '3d':
                 fig.delaxes(main_ax)
                 main_ax = fig.add_subplot(111)
             
-            spine_2d = project_to_plane(points_spine, ref_centroid, ref_e1, ref_e2)
-            tdcr_2d = project_to_plane(points_tdcr, ref_centroid, ref_e1, ref_e2)
+            legend_handles = []
+            legend_labels = []
             
-            if status[0]:
-                spine_scatter = main_ax.scatter(spine_2d[:, 0], spine_2d[:, 1], c='b', marker='o', s=40, label='Spine Points')
-            if status[1]:
-                tdcr_scatter = main_ax.scatter(tdcr_2d[:, 0], tdcr_2d[:, 1], c='g', marker='o', s=40, label='ROI Points')
+            if show_all_2d:
+                num_frames = len(considered_frames)
+                colors = cm.viridis(np.linspace(0, 1, num_frames))
+                alpha_val = 0.3  # Slightly translucent for overlay
+                
+                # Collect L1 values for legend
+                l1_values = np.array([df_spine.loc[i + IGNORE_FIRST_N_FRAMES, 'L1'] for i in considered_frames])
+                min_l1_idx = np.argmin(l1_values)
+                mid_l1_idx = len(l1_values) // 2
+                max_l1_idx = np.argmax(l1_values)
+                min_l1 = l1_values[min_l1_idx]
+                mid_l1 = l1_values[mid_l1_idx]
+                max_l1 = l1_values[max_l1_idx]
+                
+                for j, i in enumerate(considered_frames):
+                    actual_i = i + IGNORE_FIRST_N_FRAMES
+                    xs_spine_i = df_spine.loc[actual_i, x_cols_spine].values
+                    ys_spine_i = df_spine.loc[actual_i, y_cols_spine].values
+                    zs_spine_i = df_spine.loc[actual_i, z_cols_spine].values
+                    points_spine_i = np.vstack([xs_spine_i, ys_spine_i, zs_spine_i]).T
+                    
+                    # Apply displacement filtering for each frame
+                    spine_displacements_i = calculate_point_displacements(points_spine_i)
+                    if not np.all(spine_displacements_i == 0):
+                        low_displacement_mask_i = spine_displacements_i < IGNORE_FIRST_X_DISPLACEMENT
+                        xs_spine_i[low_displacement_mask_i] = df_spine.loc[REFERENCE_FRAME, x_cols_spine].values[low_displacement_mask_i]
+                        ys_spine_i[low_displacement_mask_i] = df_spine.loc[REFERENCE_FRAME, y_cols_spine].values[low_displacement_mask_i]
+                        zs_spine_i[low_displacement_mask_i] = df_spine.loc[REFERENCE_FRAME, z_cols_spine].values[low_displacement_mask_i]
+                        points_spine_i = np.vstack([xs_spine_i, ys_spine_i, zs_spine_i]).T
+                    
+                    spine_2d_i = project_to_plane(points_spine_i, ref_centroid, ref_e1, ref_e2)
+                    
+                    xs_tdcr_i = df_tdcr.loc[actual_i, x_cols_tdcr].values
+                    ys_tdcr_i = df_tdcr.loc[actual_i, y_cols_tdcr].values
+                    zs_tdcr_i = df_tdcr.loc[actual_i, z_cols_tdcr].values
+                    points_tdcr_i = np.vstack([xs_tdcr_i, ys_tdcr_i, zs_tdcr_i]).T
+                    tdcr_2d_i = project_to_plane(points_tdcr_i, ref_centroid, ref_e1, ref_e2)
+                    
+                    color = colors[j]
+                    
+                    # Apply transformation if enabled
+                    if show_transform:
+                        spine_x = spine_2d_i[:, 1]
+                        spine_y = spine_2d_i[:, 0]
+                        tdcr_x = tdcr_2d_i[:, 1]
+                        tdcr_y = tdcr_2d_i[:, 0]
+                    else:
+                        spine_x = spine_2d_i[:, 0]
+                        spine_y = spine_2d_i[:, 1]
+                        tdcr_x = tdcr_2d_i[:, 0]
+                        tdcr_y = tdcr_2d_i[:, 1]
+                    
+                    if display_check.get_status()[0]:  # Spine
+                        main_ax.scatter(spine_x, spine_y, c=[color], marker='o', s=40, alpha=alpha_val)
+                    
+                    if display_check.get_status()[1]:  # ROI_Points
+                        main_ax.scatter(tdcr_x, tdcr_y, c=[color], marker='o', s=40, alpha=alpha_val)
+                    
+                    if show_spiral:
+                        x_orig = spine_2d_i[:, 0]
+                        y_orig = spine_2d_i[:, 1]
+                        x0, y0, a, b, theta_off = fit_log_spiral_explicit_cached(i)
+                        theta_data = np.unwrap(np.arctan2(y_orig - y0, x_orig - x0))
+                        theta_min, theta_max = np.min(theta_data), np.max(theta_data)
+                        theta_fit = np.linspace(theta_min, theta_max, 200)
+                        r_fit = a * safe_exp(b * (theta_fit + theta_off))
+                        x_fit = x0 + r_fit * np.cos(theta_fit)
+                        y_fit = y0 + r_fit * np.sin(theta_fit)
+                        if show_transform:
+                            x_fit_trans = y_fit
+                            y_fit_trans = x_fit
+                            main_ax.plot(x_fit_trans, y_fit_trans, color=color, lw=2, alpha=alpha_val)
+                        else:
+                            main_ax.plot(x_fit, y_fit, color=color, lw=2, alpha=alpha_val)
+                
+                # Improved legend with representative L1 values
+                low = mlines.Line2D([], [], color=colors[min_l1_idx], linewidth=2, label=f'Min L1: {min_l1:.2f} mm')
+                mid = mlines.Line2D([], [], color=colors[mid_l1_idx], linewidth=2, label=f'Mid L1: {mid_l1:.2f} mm')
+                high = mlines.Line2D([], [], color=colors[max_l1_idx], linewidth=2, label=f'Max L1: {max_l1:.2f} mm')
+                main_ax.legend(handles=[low, mid, high], loc='upper left', fontsize=12, title='Tendon Displacement')  # Smaller legend
+                
+                title = '2D Projection and Curve Fitting'  # Updated title
+            else:
+                # Single frame plotting
+                spine_2d = project_to_plane(points_spine, ref_centroid, ref_e1, ref_e2)
+                tdcr_2d = project_to_plane(points_tdcr, ref_centroid, ref_e1, ref_e2)
+                
+                # Apply transformation if enabled
+                if show_transform:
+                    spine_x = spine_2d[:, 1]
+                    spine_y = spine_2d[:, 0]
+                    tdcr_x = tdcr_2d[:, 1]
+                    tdcr_y = tdcr_2d[:, 0]
+                else:
+                    spine_x = spine_2d[:, 0]
+                    spine_y = spine_2d[:, 1]
+                    tdcr_x = tdcr_2d[:, 0]
+                    tdcr_y = tdcr_2d[:, 1]
+                
+                if display_check.get_status()[0]:
+                    spine_scatter = main_ax.scatter(spine_x, spine_y, c='b', marker='o', s=40, label='Spine Points')
+                    legend_handles.append(spine_scatter)
+                    legend_labels.append('Spine Points')
+                if display_check.get_status()[1]:
+                    tdcr_scatter = main_ax.scatter(tdcr_x, tdcr_y, c='g', marker='o', s=40, label='ROI Points')
+                    legend_handles.append(tdcr_scatter)
+                    legend_labels.append('ROI Points')
+                
+                if show_spiral:
+                    x_orig = spine_2d[:, 0]
+                    y_orig = spine_2d[:, 1]
+                    x0, y0, a, b, theta_off = fit_log_spiral_explicit_cached(row_idx)
+                    theta_data = np.unwrap(np.arctan2(y_orig - y0, x_orig - x0))
+                    theta_min, theta_max = np.min(theta_data), np.max(theta_data)
+                    theta_fit = np.linspace(theta_min, theta_max, 200)
+                    r_fit = a * safe_exp(b * (theta_fit + theta_off))
+                    x_fit = x0 + r_fit * np.cos(theta_fit)
+                    y_fit = y0 + r_fit * np.sin(theta_fit)
+                    if show_transform:
+                        x_fit_trans = y_fit
+                        y_fit_trans = x_fit
+                        spiral_line = main_ax.plot(x_fit_trans, y_fit_trans, 'r-', lw=2, label='Fitted Spiral')
+                    else:
+                        spiral_line = main_ax.plot(x_fit, y_fit, 'r-', lw=2, label='Fitted Spiral')
+                    legend_handles.append(spiral_line[0])
+                    legend_labels.append('Fitted Spiral')
+                
+                title = '2D Projection onto Reference Plane'
             
-            if show_spiral:
-                x = spine_2d[:, 0]
-                y = spine_2d[:, 1]
-                x0, y0, a, b, theta_off = fit_log_spiral_explicit_cached(row_idx)
-                theta_data = np.unwrap(np.arctan2(y - y0, x - x0))
-                theta_min, theta_max = np.min(theta_data), np.max(theta_data)
-                theta_fit = np.linspace(theta_min, theta_max, 200)
-                r_fit = a * safe_exp(b * (theta_fit + theta_off))
-                x_fit = x0 + r_fit * np.cos(theta_fit)
-                y_fit = y0 + r_fit * np.sin(theta_fit)
-                spiral_line = main_ax.plot(x_fit, y_fit, 'r-', lw=2, label='Fitted Spiral')
-            
-            main_ax.set_xlabel('Plane X', fontsize=14)
-            main_ax.set_ylabel('Plane Y', fontsize=14)
+            main_ax.set_xlabel('X', fontsize=20)  # Increased font size for axis labels
+            main_ax.set_ylabel('Y', fontsize=20)  # Increased font size for axis labels
             main_ax.tick_params(axis='both', which='major', labelsize=24)
             main_ax.tick_params(axis='both', which='minor', labelsize=18)
-            title = '2D Projection onto Reference Plane'
             main_ax.set_title(title, fontsize=15)
-            main_ax.set_xlim(x2d_lim)
+            if show_transform:
+                if show_all_2d:
+                    main_ax.set_xlim(transform_x_lim_all)
+                else:
+                    main_ax.set_xlim(transform_x_lim_single)
+            else:
+                main_ax.set_xlim(x2d_lim)
             main_ax.set_ylim(y2d_lim)
             main_ax.axis('equal')
             main_ax.grid(True)
@@ -449,10 +603,18 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
                 fig.delaxes(main_ax)
                 main_ax = fig.add_subplot(111, projection='3d')
             
-            if status[0]:
+            # 3D mode does not support "Show All in 2D", so single frame only
+            legend_handles = []
+            legend_labels = []
+            
+            if display_check.get_status()[0]:
                 spine_scatter = main_ax.scatter(xs_spine, ys_spine, zs_spine, c='b', marker='o', s=40, label='Spine Points')
-            if status[1]:
+                legend_handles.append(spine_scatter)
+                legend_labels.append('Spine Points')
+            if display_check.get_status()[1]:
                 tdcr_scatter = main_ax.scatter(xs_tdcr, ys_tdcr, zs_tdcr, c='g', marker='o', s=40, label='ROI Points')
+                legend_handles.append(tdcr_scatter)
+                legend_labels.append('ROI Points')
             
             f = 12
             lp = 20
@@ -473,37 +635,43 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             except Exception:
                 pass
         
-        legend_handles = []
-        legend_labels = []
-        if status[1] and tdcr_scatter is not None:
-            legend_handles.append(tdcr_scatter)
-            legend_labels.append('ROI Points')
-        if status[0] and spine_scatter is not None:
-            legend_handles.append(spine_scatter)
-            legend_labels.append('Spine Points')
-        if legend_handles:
+        if not show_all_2d and legend_handles:  # Use standard legend if not in all-2D mode
             legend_ax.legend(legend_handles, legend_labels, loc='upper left', fontsize=13, frameon=True)
     
     plt.draw()
 def update(val):
-    status = check.get_status()
-    mode_2d = status[2]
-    show_spiral = status[3]
-    deviation_plot_mode = status[4]
-    show_all_deviations = status[5]
-    show_average = status[6]
+    display_status = display_check.get_status()
+    modes_status = modes_check.get_status()
+    multi_status = multi_check.get_status()
+    options_status = options_check.get_status()
     
-    # Hide slider when showing average or all deviations
-    slider_ax.set_visible(not (deviation_plot_mode and (show_all_deviations or show_average)))
+    mode_2d = modes_status[0]
+    deviation_plot_mode = modes_status[1]
+    show_spiral = display_status[2]
+    show_all_deviations = multi_status[0]
+    show_all_2d = multi_status[1]
+    show_average = multi_status[2]
+    show_transform = options_status[0]
     
-    if deviation_plot_mode and (show_all_deviations or show_average):
-        plot_row(0, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average)
+    # Hide slider when showing all/average in deviation mode or all in 2D mode
+    hide_slider = deviation_plot_mode and (show_all_deviations or show_average) or (mode_2d and show_all_2d and not deviation_plot_mode)
+    slider_ax.set_visible(not hide_slider)
+    
+    if hide_slider:
+        plot_row(0, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform)
     else:
-        plot_row(int(slider.val) - 1, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average)
+        plot_row(int(slider.val) - 1, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform)
 def toggle_visibility(label):
     update(None)
-# Initial plot with new parameter
-plot_row(0, False, True, True, True, True)
+
+
+display_check.on_clicked(toggle_visibility)
+modes_check.on_clicked(toggle_visibility)
+multi_check.on_clicked(toggle_visibility)
+options_check.on_clicked(toggle_visibility)
 slider.on_changed(update)
-check.on_clicked(toggle_visibility)
+
+
+# Initial plot with new parameter
+plot_row(0, False, True, True, True, True, False, False)
 plt.show()

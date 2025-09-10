@@ -46,7 +46,7 @@ def add_boxrois(parent_node, roi_boxes):
                       name=f"roi_{idx+1}",
                       template="Vec3d",
                       box=box,
-                      drawBoxes=True,
+                      drawBoxes=False,
                       doUpdate=True,
                       strict=False)
         roi_nodes.append(roi)
@@ -378,9 +378,8 @@ class TDCRController(Sofa.Core.Controller):
             pass
 
     def onKeypressedEvent(self, event):
-
         key = event['key']
-        print("pressed")
+
         # Existing cable control logic
         if key in self.pull_keys:
             idx = self.pull_keys[key]
@@ -388,59 +387,110 @@ class TDCRController(Sofa.Core.Controller):
         elif key in self.release_keys:
             idx = self.release_keys[key]
             self._adjust_cable(idx, -self.displacement_step)
-            # if key == "!" or self.cables[0].CableConstraint.value[0] <= 0:
-            #     self._adjust_cable(0, -self.displacement_step)
-            #     self._adjust_cable(1, self.displacement_step)
-            #     self._adjust_cable(2, self.displacement_step)
-                
+
         elif key == "4":
-            for idx in range(3):
+            for idx in range(len(self.cables)):
                 self._adjust_cable(idx, self.displacement_step)
         elif key == "$":
-            for idx in range(3):
+            for idx in range(len(self.cables)):
                 self._adjust_cable(idx, -self.displacement_step)
         elif key == "0":
-            self.optimize_theta(displacement=15.0)
+            # Example: move all cables to goals in steps
+            self.cable_stepper_to_goal(step_sizes=[0.1, 0, 0], interval=0.2, goals=[170.0, 0, 0])
+        elif key == "9":
+            # Set first cable to 0 displacement initially
+            self.cables[0].CableConstraint.value = [0.0]
+            # Start stepping the first cable to 140 with logging every 10mm
+            self.cable_stepper_to_goal_with_log_interval(step_sizes=[0.01, 0, 0], interval=0.01, goals=[70.0, 0, 0], log_interval=10.0)
 
-
-
-        # Call the new function for ROI extraction and CSV logging
-        # if key != "4" and key != "$":
-        log_roi_csv(self.csv_file,
-                    self.cables,
-                    self.roi_nodes,
-                    self.soft_body_node,
-                    printInTerminal=0
-                    )
-        spine_log_roi_csv(
-            self.cables,
-            self.roi_nodes,
-            self.soft_body_node,
-            self.roi_box_centers,
-            self.spine_csv_file,
-            printInTerminal=0
-        )
-        if key == "9":
-            # Example: move 10 units in direction 30°, in 20 steps, 0.2s apart
-            DeltaLv = 80.0
-            alpha_deg = 0.0
-            steps =(int) (10.0 * DeltaLv) 
-            interval = 0.1
-            step_size = DeltaLv / steps
-            self.virtual_tendon_stepper(DeltaLv, alpha_deg, step_size, interval, steps)
-        
-        # if not self.enable_theta_optimization_cables:
-            
-        # Existing status display
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
         force_values = [c.CableConstraint.force.value for c in self.cables]
         print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
 
+        # log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+        # spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
-        new_disp = max(0, current_disp + delta)
+        new_disp = current_disp + delta
         self.cables[idx].CableConstraint.value = [new_disp]
+
+    def cable_stepper_to_goal_with_log_interval(self, step_sizes, interval, goals, log_interval):
+        """
+        Moves each cable by its step_size every interval until it reaches its goal, but logs only every log_interval displacement for the moving cable.
+        Args:
+            step_sizes: list of step sizes for each cable (e.g. [0.1, 0, 0])
+            interval: seconds between steps
+            goals: list of final destination values for each cable (e.g. [140.0, 0, 0])
+            log_interval: displacement interval for logging (e.g. 10.0)
+        """
+        # Track the last logged displacement for the first cable (assuming idx 0 is the one moving)
+        last_logged = 0.0
+
+        def step_loop():
+            nonlocal last_logged
+            # Log initial state at 0
+            log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+            spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+            print("\n[Logged initial state at 0.]\n")
+
+            while True:
+                done = True
+                for idx, (step, goal) in enumerate(zip(step_sizes, goals)):
+                    current = self.cables[idx].CableConstraint.value[0]
+                    diff = goal - current
+                    if abs(diff) > abs(step):
+                        move = step if diff > 0 else -abs(step)
+                        self._adjust_cable(idx, move)
+                        done = False
+                    elif abs(diff) > 1e-6:
+                        self._adjust_cable(idx, diff)
+                current_disp = self.cables[0].CableConstraint.value[0]  # Track first cable
+                # Log only if we've reached or passed the next 10mm interval
+                if current_disp >= last_logged + log_interval or done:
+                    log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                    spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                    print("\n[Logged state at {:.2f}.]\n".format(current_disp))
+                    last_logged = (current_disp // log_interval) * log_interval  # Align to nearest lower interval
+
+                disp_values = [c.CableConstraint.value[0] for c in self.cables]
+                print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+                force_values = [c.CableConstraint.force.value for c in self.cables]
+                print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+                if done:
+                    # Ensure final log at exactly 140 if not already logged
+                    if abs(current_disp - goals[0]) < 1e-6 and abs(current_disp - last_logged) >= 1e-6:
+                        log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                        spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                        print("\n[Logged final state.]\n")
+                    print("Cable stepping to goal finished.")
+                    break
+                time.sleep(interval)
+        threading.Thread(target=step_loop, daemon=True).start()
+
+    # Note: The 'cable_stepper_to_goal' method is referenced but not defined in the provided Code 2 snippet.
+    # Assuming a similar implementation is needed, you may need to add or adapt it based on context.
+    # For completeness, here's a placeholder based on typical stepper logic:
+    def cable_stepper_to_goal(self, step_sizes, interval, goals):
+        def step_loop():
+            while True:
+                done = True
+                for idx, (step, goal) in enumerate(zip(step_sizes, goals)):
+                    current = self.cables[idx].CableConstraint.value[0]
+                    diff = goal - current
+                    if abs(diff) > abs(step):
+                        move = step if diff > 0 else -abs(step)
+                        self._adjust_cable(idx, move)
+                        done = False
+                    elif abs(diff) > 1e-6:
+                        self._adjust_cable(idx, diff)
+                if done:
+                    print("Cable stepping to goal finished.")
+                    break
+                time.sleep(interval)
+        threading.Thread(target=step_loop, daemon=True).start()
+
 
     def generate_cable_paths(self, theta0):
         center = (17.5, 0, 17.5)

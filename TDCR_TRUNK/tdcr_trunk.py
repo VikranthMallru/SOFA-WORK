@@ -257,21 +257,6 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         elif key in self.release_keys:
             idx = self.release_keys[key]
             self._adjust_cable(idx, -self.displacement_step)
-            # self._adjust_cable(1, self.displacement_step)
-#        # Constrained displacement of cables
-        # if key == "1":
-        #     if (self.cables[0].CableConstraint.value[0] + self.displacement_step <= self.max_displacement and
-        #         self.cables[1].CableConstraint.value[0] - self.displacement_step >= self.min_displacement):
-        #         self._adjust_cable(0, self.displacement_step)
-        #         self._adjust_cable(1, -self.displacement_step)
-
-        # elif key == "2":
-        #     if (self.cables[0].CableConstraint.value[0] - self.displacement_step >= self.min_displacement and
-        #         self.cables[1].CableConstraint.value[0] + self.displacement_step <= self.max_displacement):
-        #         self._adjust_cable(0, -self.displacement_step)
-        #         self._adjust_cable(1, self.displacement_step)
-
-
         # Contract all cables
         elif key == "4":
             for idx in range(len(self.cables)):
@@ -285,21 +270,78 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
             self.cable_stepper_to_goal(step_sizes=[0.1, 0,0],interval= 0.2,goals= [170.0, 0,0])
             # self.cable_stepper_to_goal(step_sizes=[0.1, 0.1,0.1],interval= 0.1,goals= [20.0, 20.0, 20.0])
         elif key == "9":
-            log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
-            spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
-            print("\n[Logged current state to CSV files.]\n")
+            # Set first cable to 0 displacement initially
+            self.cables[0].CableConstraint.value = [0.0]
+            # Start stepping the first cable to 140 with logging every 10mm
+            self.cable_stepper_to_goal_with_log_interval(step_sizes=[0.01, 0, 0], interval=0.01, goals=[140.0, 0, 0], log_interval=10.0)
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
         force_values = [c.CableConstraint.force.value for c in self.cables]
         print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
 
+
         # log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
         # spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+
 
     def _adjust_cable(self, idx, delta):
         current_disp = self.cables[idx].CableConstraint.value[0]
         new_disp = current_disp + delta
         self.cables[idx].CableConstraint.value = [new_disp]
+
+    def cable_stepper_to_goal_with_log_interval(self, step_sizes, interval, goals, log_interval):
+        """
+        Moves each cable by its step_size every interval until it reaches its goal, but logs only every log_interval displacement for the moving cable.
+        Args:
+            step_sizes: list of step sizes for each cable (e.g. [0.1, 0, 0])
+            interval: seconds between steps
+            goals: list of final destination values for each cable (e.g. [140.0, 0, 0])
+            log_interval: displacement interval for logging (e.g. 10.0)
+        """
+        # Track the last logged displacement for the first cable (assuming idx 0 is the one moving)
+        last_logged = 0.0
+
+        def step_loop():
+            nonlocal last_logged
+            # Log initial state at 0
+            log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+            spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+            print("\n[Logged initial state at 0.]\n")
+
+            while True:
+                done = True
+                for idx, (step, goal) in enumerate(zip(step_sizes, goals)):
+                    current = self.cables[idx].CableConstraint.value[0]
+                    diff = goal - current
+                    if abs(diff) > abs(step):
+                        move = step if diff > 0 else -abs(step)
+                        self._adjust_cable(idx, move)
+                        done = False
+                    elif abs(diff) > 1e-6:
+                        self._adjust_cable(idx, diff)
+                current_disp = self.cables[0].CableConstraint.value[0]  # Track first cable
+                # Log only if we've reached or passed the next 10mm interval
+                if current_disp >= last_logged + log_interval or done:
+                    log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                    spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                    print("\n[Logged state at {:.2f}.]\n".format(current_disp))
+                    last_logged = (current_disp // log_interval) * log_interval  # Align to nearest lower interval
+
+                disp_values = [c.CableConstraint.value[0] for c in self.cables]
+                print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
+                force_values = [c.CableConstraint.force.value for c in self.cables]
+                print("Applied forces: [{}]".format(", ".join(f"{f:.2f}" for f in force_values)))
+                if done:
+                    # Ensure final log at exactly 140 if not already logged
+                    if abs(current_disp - goals[0]) < 1e-6 and abs(current_disp - last_logged) >= 1e-6:
+                        log_roi_csv(self.csv_file, self.cables, self.roi_nodes, self.soft_body_node, printInTerminal=0)
+                        spine_log_roi_csv(self.cables, self.roi_nodes, self.soft_body_node, self.roi_box_centers, self.spine_csv_file, printInTerminal=0)
+                        print("\n[Logged final state at 140.]\n")
+                    print("Cable stepping to goal finished.")
+                    break
+                time.sleep(interval)
+        threading.Thread(target=step_loop, daemon=True).start()
+
 
 # fixingBox=[-1,0,-1,51.52,7,51.52]
 
