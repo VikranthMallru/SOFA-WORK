@@ -13,6 +13,16 @@ IGNORE_FIRST_N_FRAMES = 0
 IGNORE_FIRST_X_DISPLACEMENT = 0.0   
 EVERY_N_FRAMES = 1 #min 1
 REFERENCE_FRAME = 4  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
+# Font size configuration variables
+SLIDER_LABEL_FONT_SIZE = 16
+CHECKBUTTON_LABEL_FONT_SIZE = 12
+GROUP_TITLE_FONT_SIZE = 14
+AXIS_LABEL_FONT_SIZE = 20
+TICK_MAJOR_FONT_SIZE = 20
+TICK_MINOR_FONT_SIZE = 18
+PLOT_TITLE_FONT_SIZE = 20
+LEGEND_ITEM_FONT_SIZE = 14
+LEGEND_TITLE_FONT_SIZE = 14
 # ----------------------------------------------------------
 # Load data
 # Using file names from circle fit code
@@ -150,12 +160,10 @@ plt.subplots_adjust(left=0.15, right=0.80, bottom=0.25, top=0.85)
 # Axes for deviation plot and legend
 deviation_ax = fig.add_axes([0.15, 0.15, 0.65, 0.65])
 deviation_ax.set_visible(False)
-legend_ax = plt.axes([0.85, 0.85, 0.13, 0.15])
-legend_ax.axis('off')
 # Slider
 slider_ax = fig.add_axes([0.2, 0.08, 0.5, 0.03])
 slider = Slider(slider_ax, 'Frame Slider', 1, len(considered_frames), valinit=1, valstep=1)
-slider.label.set_fontsize(16)
+slider.label.set_fontsize(SLIDER_LABEL_FONT_SIZE)
 # Check buttons grouped
 # Group 1: Display
 display_ax = plt.axes([0.85, 0.65, 0.13, 0.15])
@@ -163,32 +171,40 @@ display_labels = ['Spine', 'ROI_Points', 'Show Circle']
 display_vals = [True, True, True]
 display_check = CheckButtons(display_ax, display_labels, display_vals)
 for text in display_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.80, 'Display', fontsize=14, fontweight='bold')
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.80, 'Display', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 # Group 2: Modes
 modes_ax = plt.axes([0.85, 0.50, 0.13, 0.10])
 modes_labels = ['2D Mode', 'Deviation Plot Mode']
 modes_vals = [False, False]
 modes_check = CheckButtons(modes_ax, modes_labels, modes_vals)
 for text in modes_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.60, 'Modes', fontsize=14, fontweight='bold')
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.60, 'Modes', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 # Group 3: Multi-frame
 multi_ax = plt.axes([0.85, 0.35, 0.13, 0.15])
 multi_labels = ['Show All Frames', 'Show All in 2D', 'Show Average']
 multi_vals = [False, False, False]
 multi_check = CheckButtons(multi_ax, multi_labels, multi_vals)
 for text in multi_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.50, 'Multi-Frame', fontsize=14, fontweight='bold')
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.50, 'Multi-Frame', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 # Group 4: 2D Options
 options_ax = plt.axes([0.85, 0.25, 0.13, 0.05])
 options_labels = ['Transform 2D']
 options_vals = [False]
 options_check = CheckButtons(options_ax, options_labels, options_vals)
 for text in options_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.30, '2D Options', fontsize=14, fontweight='bold')
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.30, '2D Options', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
+# New Group: Legend Toggle
+legend_ax = plt.axes([0.85, 0.15, 0.13, 0.05])
+legend_labels = ['Show Legend']
+legend_vals = [True]
+legend_check = CheckButtons(legend_ax, legend_labels, legend_vals)
+for text in legend_check.labels:
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.20, 'Legend', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 # Globals for scatter and plots
 spine_scatter = None
 tdcr_scatter = None
@@ -208,10 +224,8 @@ def get_angle_range(center, e1, e2, points_spine):
         angle_end += 2 * np.pi
     return angle_start, angle_end
 # Main plotting function
-def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_spiral):
-    global spine_scatter, tdcr_scatter, circle_line, line_fit, main_ax, deviation_ax, legend_ax
-    legend_ax.clear()
-    legend_ax.axis('off')
+def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_legend):
+    global spine_scatter, tdcr_scatter, circle_line, line_fit, main_ax, deviation_ax
     main_ax.clear()
     deviation_ax.clear()
     deviation_ax.set_visible(deviation_plot_mode)
@@ -256,7 +270,6 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                 ]).T
                 if c is None or r == np.inf:
                     continue
-                # Project points to the fitted plane
                 points_2d = project_to_plane(points, c, v1, v2)
                 dists_3d = np.linalg.norm(points - c, axis=1)
                 deviations = np.abs(dists_3d - r)
@@ -309,26 +322,26 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
             min_idx = np.argmin(l1_values)
             mid_idx = len(l1_values) // 2
             max_idx = np.argmax(l1_values)
-            low = mlines.Line2D([], [], color=colors[min_idx], linewidth=2, label=f'Min Disp: {l1_values[min_idx]:.2f}')
-            mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f}')
-            high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f}')
+            low = mlines.Line2D([], [], color=colors[min_idx], linewidth=2, label=f'Min Disp: {l1_values[min_idx]:.2f} mm')
+            mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f} mm')
+            high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f} mm')
             legend_handles = [low, mid, high]
-        deviation_ax.set_xlabel('Length', fontsize=24)
-        deviation_ax.set_ylabel('Deviation (mm)', fontsize=24)
-        deviation_ax.tick_params(axis='both', which='major', labelsize=24)
-        deviation_ax.tick_params(axis='both', which='minor', labelsize=18)
+        deviation_ax.set_xlabel('Length (cm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.set_ylabel('Deviation (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+        deviation_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
         deviation_ax.grid(True)
         deviation_ax.set_ylim(0, 5)
         if show_average and show_all_deviations:
-            deviation_ax.set_title('Deviation Plot', fontsize=20)
+            deviation_ax.set_title('Deviation Plot', fontsize=PLOT_TITLE_FONT_SIZE)
         elif show_average:
-            deviation_ax.set_title('Average Deviation Plot - Considered Frames', fontsize=20)
+            deviation_ax.set_title('Average Deviation Plot - Considered Frames', fontsize=PLOT_TITLE_FONT_SIZE)
         elif show_all_deviations:
-            deviation_ax.set_title('Deviation Plot - All Considered Frames', fontsize=20)
+            deviation_ax.set_title('Deviation Plot - All Considered Frames', fontsize=PLOT_TITLE_FONT_SIZE)
         else:
-            deviation_ax.set_title(f'Deviation Plot - Frame {actual_idx + 1}', fontsize=20)
-        if legend_handles:
-            deviation_ax.legend(handles=legend_handles, fontsize=12, loc='upper left')
+            deviation_ax.set_title(f'Deviation Plot - Frame {actual_idx + 1}', fontsize=PLOT_TITLE_FONT_SIZE)
+        if show_legend and legend_handles:
+            deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, loc='upper left', bbox_to_anchor=(-0.15, 1.15))
     else:
         # Plot 2D or 3D visualization
         if mode_2d:
@@ -381,7 +394,7 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                         main_ax.scatter(sp_x, sp_y, c=[color], marker='o', s=40, alpha=alpha_val)
                     if display_check.get_status()[1]:
                         main_ax.scatter(td_x, td_y, c=[color], marker='o', s=40, alpha=alpha_val)
-                    if show_spiral:
+                    if display_check.get_status()[2]:
                         angle_start, angle_end = get_angle_range(c, v1, v2, pts_sp)
                         angles = np.linspace(angle_start, angle_end, 200)
                         x_fit_plane = r * np.cos(angles)
@@ -402,15 +415,16 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                 min_idx = np.argmin(l1_values)
                 mid_idx = len(l1_values) // 2
                 max_idx = np.argmax(l1_values)
-                low = mlines.Line2D([], [], color=colors[min_idx], linewidth=2, label=f'Min Disp: {l1_values[min_idx]:.2f}')
-                mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f}')
-                high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f}')
-                main_ax.legend(handles=[low, mid, high], loc='upper right', fontsize=12, title='Tendon Displacement')
-                main_ax.set_xlabel('X', fontsize=20)
-                main_ax.set_ylabel('Y', fontsize=20)
-                main_ax.tick_params(axis='both', which='major', labelsize=24)
-                main_ax.tick_params(axis='both', which='minor', labelsize=18)
-                main_ax.set_title('2D Projection and Curve Fitting', fontsize=15)
+                low = mlines.Line2D([], [], color=colors[min_idx], linewidth=2, label=f'Min Disp: {l1_values[min_idx]:.2f} mm')
+                mid = mlines.Line2D([], [], color=colors[mid_idx], linewidth=2, label=f'Mid Disp: {l1_values[mid_idx]:.2f} mm')
+                high = mlines.Line2D([], [], color=colors[max_idx], linewidth=2, label=f'Max Disp: {l1_values[max_idx]:.2f} mm')
+                if show_legend:
+                    main_ax.legend(handles=[low, mid, high], loc='upper left', bbox_to_anchor=(-0.15, 1.15), fontsize=LEGEND_ITEM_FONT_SIZE, title='Tendon Displacement', title_fontsize=LEGEND_TITLE_FONT_SIZE)
+                main_ax.set_xlabel('X', fontsize=AXIS_LABEL_FONT_SIZE)
+                main_ax.set_ylabel('Y', fontsize=AXIS_LABEL_FONT_SIZE)
+                main_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+                main_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
+                main_ax.set_title('Bending Curve', fontsize=PLOT_TITLE_FONT_SIZE)
                 main_ax.set_xlim(-30, main_ax.get_xlim()[1])
             else:
                 # Single frame 2D plot
@@ -427,7 +441,7 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                         spine_scatter = main_ax.scatter(sp_x, sp_y, c='b', marker='o', s=40, label='Spine Points')
                     if display_check.get_status()[1]:
                         tdcr_scatter = main_ax.scatter(td_x, td_y, c='g', marker='o', s=40, label='ROI Points')
-                    if show_spiral:
+                    if display_check.get_status()[2]:
                         angle_start, angle_end = get_angle_range(center, e1, e2, points_spine)
                         angles = np.linspace(angle_start, angle_end, 200)
                         x_fit_plane = radius * np.cos(angles)
@@ -438,12 +452,12 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                         else:
                             x_fit_plot = x_fit_plane
                             y_fit_plot = y_fit_plane
-                        spiral_line = main_ax.plot(x_fit_plot, y_fit_plot, 'r-', lw=2, label='Fitted Circle')
-                    main_ax.set_xlabel('X', fontsize=20)
-                    main_ax.set_ylabel('Y', fontsize=20)
-                    main_ax.tick_params(axis='both', which='major', labelsize=24)
-                    main_ax.tick_params(axis='both', which='minor', labelsize=18)
-                    main_ax.set_title('2D Projection onto Reference Plane', fontsize=15)
+                        spiral_line = main_ax.plot(x_fit_plot, y_fit_plot, 'r-', lw=2, label='Bending Curve')
+                    main_ax.set_xlabel('X', fontsize=AXIS_LABEL_FONT_SIZE)
+                    main_ax.set_ylabel('Y', fontsize=AXIS_LABEL_FONT_SIZE)
+                    main_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+                    main_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
+                    main_ax.set_title('Bending Curve', fontsize=PLOT_TITLE_FONT_SIZE)
             main_ax.axis('equal')
             main_ax.grid(True)
         else:
@@ -482,15 +496,15 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                 if display_check.get_status()[2] and display_check.get_status()[0]:
                     main_ax.add_collection3d(circle_line)
             if display_check.get_status()[2] and display_check.get_status()[0]:
-                legend_handles.append(mlines.Line2D([], [], color='r', lw=5, label='Fitted Circle'))
-            main_ax.set_xlabel('X', fontsize=14, labelpad=20)
-            main_ax.set_ylabel('Y', fontsize=14, labelpad=20)
-            main_ax.set_zlabel('Z', fontsize=14, labelpad=20)
-            main_ax.tick_params(axis='both', which='major', labelsize=20)
-            main_ax.tick_params(axis='both', which='minor', labelsize=14)
+                legend_handles.append(mlines.Line2D([], [], color='r', lw=5, label='Bending Curve'))
+            main_ax.set_xlabel('X', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=20)
+            main_ax.set_ylabel('Y', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=20)
+            main_ax.set_zlabel('Z', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=20)
+            main_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+            main_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
             radius_or_len = radius if radius != np.inf else np.linalg.norm(points_spine[-1] - points_spine[0])
             title_str = f"Radius: {radius_or_len:.4f} mm"
-            main_ax.set_title(title_str, fontsize=16)
+            main_ax.set_title(title_str, fontsize=PLOT_TITLE_FONT_SIZE)
             main_ax.set_xlim(x_lim)
             main_ax.set_ylim(y_lim)
             main_ax.set_zlim(z_lim)
@@ -498,8 +512,8 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                 main_ax.set_box_aspect([1,1,1])
             except Exception:
                 pass
-        if legend_handles:
-            legend_ax.legend(legend_handles, [h.get_label() for h in legend_handles], loc='upper left', fontsize=13, frameon=True)
+            if show_legend and legend_handles:
+                main_ax.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(-0.15, 1.15), fontsize=LEGEND_ITEM_FONT_SIZE, frameon=True)
     plt.draw()
 # Update function
 def update(val):
@@ -507,25 +521,27 @@ def update(val):
     modes_status = modes_check.get_status()
     multi_status = multi_check.get_status()
     options_status = options_check.get_status()
+    legend_status = legend_check.get_status()
     mode_2d = modes_status[0]
     deviation_plot_mode = modes_status[1]
     show_all_deviations = multi_status[0]
     show_all_2d = multi_status[1]
     show_average = multi_status[2]
     show_transform = options_status[0]
-    show_spiral = display_status[2]
+    show_legend = legend_status[0]
     hide_slider = deviation_plot_mode and (show_all_deviations or show_average) or (mode_2d and show_all_2d and not deviation_plot_mode)
     slider_ax.set_visible(not hide_slider)
     if hide_slider:
-        plot_row(0, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_spiral)
+        plot_row(0, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_legend)
     else:
-        plot_row(int(slider.val) - 1, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_spiral)
+        plot_row(int(slider.val) - 1, mode_2d, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform, show_legend)
 def toggle_visibility(label):
     update(None)
 display_check.on_clicked(toggle_visibility)
 modes_check.on_clicked(toggle_visibility)
 multi_check.on_clicked(toggle_visibility)
 options_check.on_clicked(toggle_visibility)
+legend_check.on_clicked(toggle_visibility)
 slider.on_changed(update)
 plot_row(0, False, False, False, False, False, False, True)
 plt.show()

@@ -406,7 +406,7 @@ class TDCRController(Sofa.Core.Controller):
                 self.blocking_cable_stepper_to_goal_with_log_interval(
                     step_sizes=[0.01, 0.0, 0.0],
                     interval=0.01,
-                    goals=[70.0, 0.0, 0.0],
+                    goals=[70.0,0.0, 0.0],
                     log_interval=10.0
                 )
                 # self.blocking_cable_stepper_to_goal_with_log_interval(
@@ -417,6 +417,9 @@ class TDCRController(Sofa.Core.Controller):
                 # )
 
             threading.Thread(target=sequence, daemon=True).start()
+        elif key == "8":
+            # Optimize cable angles
+            self.optimize_theta(displacement=20.0, settle_steps=20, max_disp=40.0)
 
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
@@ -704,7 +707,7 @@ def TDCR(parentNode, name="TDCR",
         volume_mesh="tdcr_volume.vtk",
         surface_mesh="tdcr_surface.stl",
         collision_mesh="tdcr_collision.stl",
-        young_modulus=8_000,
+        young_modulus=80_000,
         poisson_ratio=0.25,
         total_mass=0.03,
         surface_color=[0.96, 0.87, 0.70, 1.0],
@@ -886,7 +889,7 @@ def createScene(rootNode):
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
     TDCR(rootNode,
          enable_theta_optimization_cables=False,
-         initial_theta_deg=0.0, resolution_deg=3,
+         initial_theta_deg=45.0, resolution_deg=45,
          minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
     # add_rigid_object_from_stl(

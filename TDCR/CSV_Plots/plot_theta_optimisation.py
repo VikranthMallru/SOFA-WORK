@@ -10,7 +10,7 @@ plt.rcParams['font.serif'] = ['cmr10']  # Computer Modern Roman 10pt
 plt.rcParams['axes.formatter.use_mathtext'] = True
 plt.rcParams['font.size'] = 32  # Set global font size very large for all elements
 
-summary_file = "tdcr_theta_optim_summary_res3.csv"
+summary_file = "tdcr_theta_optim_summary.csv"
 
 if os.path.exists(summary_file):
     df = pd.read_csv(summary_file)

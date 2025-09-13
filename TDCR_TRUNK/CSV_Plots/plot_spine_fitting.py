@@ -7,23 +7,25 @@ import matplotlib.lines as mlines  # Added for custom legend handle
 from matplotlib import cm  # Added for colormaps
 
 
-
-
-
-
-
 # ------- CONFIG: Edit these to control frame skipping -------
-IGNORE_FIRST_N_FRAMES = 0        
+# IGNORE_FIRST_N_FRAMES = 11
+IGNORE_FIRST_N_FRAMES = 3      
 IGNORE_FIRST_X_DISPLACEMENT = 4.0   
 EVERY_N_FRAMES = 1 #min 1
 REFERENCE_FRAME = 0  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
-IGNORE_FRAMES = [0,1,2,3,7]  # Add specific frame numbers (actual indices) to ignore, e.g., [10, 25, 50]
+# IGNORE_FRAMES = [0,1,2,3,7] 
+IGNORE_FRAMES = [0,1,2,3,15]  # Add specific frame numbers (actual indices) to ignore, e.g., [10, 25, 50]
+# Font size configuration variables
+SLIDER_LABEL_FONT_SIZE = 16
+CHECKBUTTON_LABEL_FONT_SIZE = 12
+GROUP_TITLE_FONT_SIZE = 14
+AXIS_LABEL_FONT_SIZE = 20
+TICK_MAJOR_FONT_SIZE = 20
+TICK_MINOR_FONT_SIZE = 18
+PLOT_TITLE_FONT_SIZE = 20
+LEGEND_ITEM_FONT_SIZE = 13
+LEGEND_TITLE_FONT_SIZE = 13
 # ----------------------------------------------------------
-
-
-
-
-
 
 
 # ------- VISUAL: Use Computer Modern (LaTeX) fonts -------
@@ -133,9 +135,16 @@ def fit_log_spiral_explicit(x, y, maxiter=20000, use_global_opt=False, iter_refi
     if len(x) < 5:
         return np.nan, np.nan, np.nan, np.nan, np.nan
     
+    # Check direction and reverse if theta is decreasing
     x0_init = np.median(x)
     y0_init = np.median(y)
-    theta = np.unwrap(np.arctan2(y - y0_init, x - x0_init))
+    theta = np.arctan2(y - y0_init, x - x0_init)
+    if len(theta) > 1 and np.mean(np.diff(theta)) < 0:
+        x = x[::-1]
+        y = y[::-1]
+        theta = np.arctan2(y - y0_init, x - x0_init)  # Recompute
+    
+    theta = np.unwrap(theta)
     r = np.sqrt((x - x0_init)**2 + (y - y0_init)**2)
     weights = r / np.max(r)
     p = np.polyfit(theta, np.log(np.maximum(r,1e-8)), 1, w=weights)
@@ -185,9 +194,16 @@ def fit_log_spiral_explicit(x, y, maxiter=20000, use_global_opt=False, iter_refi
         x_refine = x[keep_mask]
         y_refine = y[keep_mask]
         
+        # Check direction for refined points
         x0_init = np.median(x_refine)
         y0_init = np.median(y_refine)
-        theta = np.unwrap(np.arctan2(y_refine - y0_init, x_refine - x0_init))
+        theta = np.arctan2(y_refine - y0_init, x_refine - x0_init)
+        if len(theta) > 1 and np.mean(np.diff(theta)) < 0:
+            x_refine = x_refine[::-1]
+            y_refine = y_refine[::-1]
+            theta = np.arctan2(y_refine - y0_init, x_refine - x0_init)  # Recompute
+        
+        theta = np.unwrap(theta)
         r = np.sqrt((x_refine - x0_init)**2 + (y_refine - y0_init)**2)
         p = np.polyfit(theta, np.log(np.maximum(r,1e-8)), 1, w=(r/np.max(r)))
         a0 = np.exp(p[1])
@@ -261,9 +277,7 @@ deviation_ax = fig.add_axes([0.15, 0.15, 0.65, 0.65])  # Adjusted to shift right
 deviation_ax.set_visible(False)
 slider_ax = fig.add_axes([0.2, 0.08, 0.5, 0.03])  # Moved slider up
 slider = Slider(slider_ax, 'Frame Slider', 1, len(considered_frames), valinit=1, valstep=1)
-slider.label.set_fontsize(16)
-
-
+slider.label.set_fontsize(SLIDER_LABEL_FONT_SIZE)
 
 
 # Group 1: Display Elements
@@ -272,10 +286,8 @@ display_labels = ['Spine', 'ROI_Points', 'Show Spiral']
 display_vals = [True, True, True]
 display_check = CheckButtons(display_ax, display_labels, display_vals)
 for text in display_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.80, 'Display', fontsize=14, fontweight='bold')
-
-
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.80, 'Display', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 
 
 # Group 2: View Modes
@@ -284,10 +296,8 @@ modes_labels = ['2D Mode', 'Deviation Plot Mode']
 modes_vals = [False, False]
 modes_check = CheckButtons(modes_ax, modes_labels, modes_vals)
 for text in modes_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.60, 'Modes', fontsize=14, fontweight='bold')
-
-
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.60, 'Modes', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 
 
 # Group 3: Multi-Frame Options
@@ -296,34 +306,70 @@ multi_labels = ['Show All Frames', 'Show All in 2D', 'Show Average']
 multi_vals = [False, False, False]
 multi_check = CheckButtons(multi_ax, multi_labels, multi_vals)
 for text in multi_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.50, 'Multi-Frame', fontsize=14, fontweight='bold')
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.50, 'Multi-Frame', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 
 
+# Group 4: 2D Transform Options (now with checkboxes for multiple selections)
+transform_ax = plt.axes([0.85, 0.10, 0.13, 0.25])  # Expanded height for more options, shifted right
+transform_labels = ['90° CCW', '90° CW', '180°', 'Flip X', 'Flip Y', 'Flip XY']
+transform_vals = [False] * len(transform_labels)
+transform_check = CheckButtons(transform_ax, transform_labels, transform_vals)
+for text in transform_check.labels:
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.35, '2D Transforms', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 
 
-# Group 4: 2D Options
-options_ax = plt.axes([0.85, 0.25, 0.13, 0.05])  # Shifted right
-options_labels = ['Transform 2D']
-options_vals = [False]
-options_check = CheckButtons(options_ax, options_labels, options_vals)
-for text in options_check.labels:
-    text.set_fontsize(12)
-fig.text(0.85, 0.30, '2D Options', fontsize=14, fontweight='bold')
+# New Group: Legend Toggle
+legend_ax = plt.axes([0.85, 0.05, 0.13, 0.05])  # Below 2D Transform
+legend_labels = ['Show Legend']
+legend_vals = [True]
+legend_check = CheckButtons(legend_ax, legend_labels, legend_vals)
+for text in legend_check.labels:
+    text.set_fontsize(CHECKBUTTON_LABEL_FONT_SIZE)
+fig.text(0.85, 0.10, 'Legend', fontsize=GROUP_TITLE_FONT_SIZE, fontweight='bold')
 
 
-
-
-legend_ax = plt.axes([0.85, 0.85, 0.13, 0.15])  # Shifted right
-legend_ax.axis('off')
 spine_scatter = None
 tdcr_scatter = None
 spiral_line = None
-def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform):
-    global spine_scatter, tdcr_scatter, spiral_line, main_ax, deviation_ax, legend_ax
+
+def apply_transform(points, transform_option):
+    """
+    Apply a single 2D transformation to points (Nx2 array).
+    """
+    x = points[:, 0]
+    y = points[:, 1]
+    if transform_option == '90° CCW':
+        return np.column_stack([-y, x])
+    elif transform_option == '90° CW':
+        return np.column_stack([y, -x])
+    elif transform_option == '180°':
+        return np.column_stack([-x, -y])
+    elif transform_option == 'Flip X':
+        return np.column_stack([-x, y])
+    elif transform_option == 'Flip Y':
+        return np.column_stack([x, -y])
+    elif transform_option == 'Flip XY':
+        return np.column_stack([-x, -y])
+    else:
+        return points  # No transform
+
+def transform_2d_points(points, selected_transforms):
+    """
+    Apply multiple transformations in sequence.
+    Order: rotations first (90 CCW, 90 CW, 180), then flips (X, Y, XY).
+    """
+    # Define order of application
+    order = ['90° CCW', '90° CW', '180°', 'Flip X', 'Flip Y', 'Flip XY']
+    for opt in order:
+        if opt in selected_transforms:
+            points = apply_transform(points, opt)
+    return points
+
+def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, selected_transforms, show_legend=True):
+    global spine_scatter, tdcr_scatter, spiral_line, main_ax, deviation_ax
     
-    legend_ax.clear()
-    legend_ax.axis('off')
     main_ax.clear()
     deviation_ax.clear()
     deviation_ax.set_visible(deviation_plot_mode)
@@ -460,24 +506,24 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             avg_line, = deviation_ax.plot(point_indices_avg, avg_deviations, avg_color + '-', linewidth=5, label='Average Deviation')
             legend_handles.append(avg_line)
         
-        deviation_ax.set_xlabel('Length (cm)', fontsize=24)
-        deviation_ax.set_ylabel('Deviation (mm)', fontsize=24)
-        deviation_ax.tick_params(axis='both', which='major', labelsize=24)
-        deviation_ax.tick_params(axis='both', which='minor', labelsize=18)
+        deviation_ax.set_xlabel('Length (cm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.set_ylabel('Deviation (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+        deviation_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
         deviation_ax.grid(True)
         deviation_ax.set_ylim(0, 30)  # Updated y-axis limit
         
         if show_average and show_all_deviations:
-            deviation_ax.set_title('Deviation Plot', fontsize=20)
+            deviation_ax.set_title('Deviation Plot', fontsize=PLOT_TITLE_FONT_SIZE)
         elif show_average:
-            deviation_ax.set_title('Average Deviation Plot - Considered Frames', fontsize=20)
+            deviation_ax.set_title('Average Deviation Plot - Considered Frames', fontsize=PLOT_TITLE_FONT_SIZE)
         elif show_all_deviations:
-            deviation_ax.set_title('Deviation Plot - All Considered Frames', fontsize=20)
+            deviation_ax.set_title('Deviation Plot - All Considered Frames', fontsize=PLOT_TITLE_FONT_SIZE)
         else:
-            deviation_ax.set_title(f'Deviation Plot - Frame {actual_idx + 1} ', fontsize=20)
+            deviation_ax.set_title(f'Deviation Plot - Frame {actual_idx + 1} ', fontsize=PLOT_TITLE_FONT_SIZE)
         
-        if legend_handles:
-            deviation_ax.legend(handles=legend_handles, fontsize=12, loc='upper left')  # Increased font size for bigger legend
+        if show_legend and legend_handles:
+            deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, loc='upper left', bbox_to_anchor=(-0.3, 1.2))  # Top left outside, more up
     else:
         if mode_2d:
             if main_ax.name == '3d':
@@ -525,103 +571,87 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
                     points_tdcr_i = np.vstack([xs_tdcr_i, ys_tdcr_i, zs_tdcr_i]).T
                     tdcr_2d_i = project_to_plane(points_tdcr_i, ref_centroid, ref_e1, ref_e2)
                     
+                    # Apply selected transformations
+                    spine_2d_i = transform_2d_points(spine_2d_i, selected_transforms)
+                    tdcr_2d_i = transform_2d_points(tdcr_2d_i, selected_transforms)
+                    
                     color = colors[j]
                     
-                    # Apply transformation if enabled
-                    if show_transform:
-                        spine_x = spine_2d_i[:, 1]
-                        spine_y = spine_2d_i[:, 0]
-                        tdcr_x = tdcr_2d_i[:, 1]
-                        tdcr_y = tdcr_2d_i[:, 0]
-                    else:
-                        spine_x = spine_2d_i[:, 0]
-                        spine_y = spine_2d_i[:, 1]
-                        tdcr_x = tdcr_2d_i[:, 0]
-                        tdcr_y = tdcr_2d_i[:, 1]
-                    
                     if display_check.get_status()[0]:  # Spine
-                        main_ax.scatter(spine_x, spine_y, c=[color], marker='o', s=40, alpha=alpha_val)
+                        main_ax.scatter(spine_2d_i[:, 0], spine_2d_i[:, 1], c=[color], marker='o', s=40, alpha=alpha_val)
                     
                     if display_check.get_status()[1]:  # ROI_Points
-                        main_ax.scatter(tdcr_x, tdcr_y, c=[color], marker='o', s=40, alpha=alpha_val)
+                        main_ax.scatter(tdcr_2d_i[:, 0], tdcr_2d_i[:, 1], c=[color], marker='o', s=40, alpha=alpha_val)
                     
                     if show_spiral:
-                        x_orig = spine_2d_i[:, 0]
-                        y_orig = spine_2d_i[:, 1]
-                        x0, y0, a, b, theta_off = fit_log_spiral_explicit_cached(i)
-                        theta_data = np.unwrap(np.arctan2(y_orig - y0, x_orig - x0))
+                        x = spine_2d_i[:, 0]
+                        y = spine_2d_i[:, 1]
+                        x0, y0, a, b, theta_off = fit_log_spiral_explicit(x, y)
+                        theta_data = np.unwrap(np.arctan2(y - y0, x - x0))
                         theta_min, theta_max = np.min(theta_data), np.max(theta_data)
                         theta_fit = np.linspace(theta_min, theta_max, 200)
                         r_fit = a * safe_exp(b * (theta_fit + theta_off))
                         x_fit = x0 + r_fit * np.cos(theta_fit)
                         y_fit = y0 + r_fit * np.sin(theta_fit)
-                        if show_transform:
-                            x_fit_trans = y_fit
-                            y_fit_trans = x_fit
-                            main_ax.plot(x_fit_trans, y_fit_trans, color=color, lw=2, alpha=alpha_val)
-                        else:
-                            main_ax.plot(x_fit, y_fit, color=color, lw=2, alpha=alpha_val)
+                        main_ax.plot(x_fit, y_fit, color=color, lw=2, alpha=alpha_val)
                 
                 # Improved legend with representative L1 values
-                low = mlines.Line2D([], [], color=colors[min_l1_idx], linewidth=2, label=f'Min L1: {min_l1:.2f} mm')
-                mid = mlines.Line2D([], [], color=colors[mid_l1_idx], linewidth=2, label=f'Mid L1: {mid_l1:.2f} mm')
-                high = mlines.Line2D([], [], color=colors[max_l1_idx], linewidth=2, label=f'Max L1: {max_l1:.2f} mm')
-                main_ax.legend(handles=[low, mid, high], loc='upper left', fontsize=12, title='Tendon Displacement')  # Smaller legend
+                low = mlines.Line2D([], [], color=colors[min_l1_idx], linewidth=2, label=f'Min Disp: {min_l1:.2f} mm')
+                mid = mlines.Line2D([], [], color=colors[mid_l1_idx], linewidth=2, label=f'Mid Disp: {mid_l1:.2f} mm')
+                high = mlines.Line2D([], [], color=colors[max_l1_idx], linewidth=2, label=f'Max Disp: {max_l1:.2f} mm')
+                legend_handles = [low, mid, high]
+                if show_legend:
+                    main_ax.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(-0.1, 1.2), fontsize=LEGEND_ITEM_FONT_SIZE, title='Tendon Displacement', title_fontsize=LEGEND_TITLE_FONT_SIZE)  # Adjusted less left
                 
-                title = '2D Projection and Curve Fitting'  # Updated title
+                title = 'Bending Curve'  # Updated title
             else:
                 # Single frame plotting
                 spine_2d = project_to_plane(points_spine, ref_centroid, ref_e1, ref_e2)
                 tdcr_2d = project_to_plane(points_tdcr, ref_centroid, ref_e1, ref_e2)
                 
-                # Apply transformation if enabled
-                if show_transform:
-                    spine_x = spine_2d[:, 1]
-                    spine_y = spine_2d[:, 0]
-                    tdcr_x = tdcr_2d[:, 1]
-                    tdcr_y = tdcr_2d[:, 0]
-                else:
-                    spine_x = spine_2d[:, 0]
-                    spine_y = spine_2d[:, 1]
-                    tdcr_x = tdcr_2d[:, 0]
-                    tdcr_y = tdcr_2d[:, 1]
+                # Apply selected transformations
+                spine_2d = transform_2d_points(spine_2d, selected_transforms)
+                tdcr_2d = transform_2d_points(tdcr_2d, selected_transforms)
+                spine_x = spine_2d[:, 0]
+                spine_y = spine_2d[:, 1]
+                tdcr_x = tdcr_2d[:, 0]
+                tdcr_y = tdcr_2d[:, 1]
                 
                 if display_check.get_status()[0]:
-                    spine_scatter = main_ax.scatter(spine_x, spine_y, c='b', marker='o', s=40, label='Spine Points')
+                    spine_scatter = main_ax.scatter(spine_x, spine_y, c='b', marker='o', s=40, label='Continuum Backbone')
                     legend_handles.append(spine_scatter)
-                    legend_labels.append('Spine Points')
+                    legend_labels.append('Continuum Backbone')
                 if display_check.get_status()[1]:
                     tdcr_scatter = main_ax.scatter(tdcr_x, tdcr_y, c='g', marker='o', s=40, label='ROI Points')
                     legend_handles.append(tdcr_scatter)
                     legend_labels.append('ROI Points')
                 
                 if show_spiral:
-                    x_orig = spine_2d[:, 0]
-                    y_orig = spine_2d[:, 1]
-                    x0, y0, a, b, theta_off = fit_log_spiral_explicit_cached(row_idx)
-                    theta_data = np.unwrap(np.arctan2(y_orig - y0, x_orig - x0))
+                    x = spine_2d[:, 0]
+                    y = spine_2d[:, 1]
+                    x0, y0, a, b, theta_off = fit_log_spiral_explicit(x, y)
+                    theta_data = np.unwrap(np.arctan2(y - y0, x - x0))
                     theta_min, theta_max = np.min(theta_data), np.max(theta_data)
                     theta_fit = np.linspace(theta_min, theta_max, 200)
                     r_fit = a * safe_exp(b * (theta_fit + theta_off))
                     x_fit = x0 + r_fit * np.cos(theta_fit)
                     y_fit = y0 + r_fit * np.sin(theta_fit)
-                    if show_transform:
-                        x_fit_trans = y_fit
-                        y_fit_trans = x_fit
-                        spiral_line = main_ax.plot(x_fit_trans, y_fit_trans, 'r-', lw=2, label='Fitted Spiral')
-                    else:
-                        spiral_line = main_ax.plot(x_fit, y_fit, 'r-', lw=2, label='Fitted Spiral')
+                    spiral_line = main_ax.plot(x_fit, y_fit, 'r-', lw=2, label='Bending Curve')
                     legend_handles.append(spiral_line[0])
-                    legend_labels.append('Fitted Spiral')
+                    legend_labels.append('Bending Curve')
                 
-                title = '2D Projection onto Reference Plane'
+                # Add legend for single frame 2D
+                if show_legend and legend_handles:
+                    main_ax.legend(handles=legend_handles, labels=legend_labels, loc='upper left', bbox_to_anchor=(-0.1, 1.2), fontsize=LEGEND_ITEM_FONT_SIZE)
+                
+                title = 'Bending Curve'
             
-            main_ax.set_xlabel('X', fontsize=20)  # Increased font size for axis labels
-            main_ax.set_ylabel('Y', fontsize=20)  # Increased font size for axis labels
-            main_ax.tick_params(axis='both', which='major', labelsize=24)
-            main_ax.tick_params(axis='both', which='minor', labelsize=18)
-            main_ax.set_title(title, fontsize=15)
-            if show_transform:
+            main_ax.set_xlabel('X', fontsize=AXIS_LABEL_FONT_SIZE)  # Increased font size for axis labels
+            main_ax.set_ylabel('Y', fontsize=AXIS_LABEL_FONT_SIZE)  # Increased font size for axis labels
+            main_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+            main_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
+            main_ax.set_title(title, fontsize=PLOT_TITLE_FONT_SIZE)
+            if selected_transforms:  # If any transform is selected
                 if show_all_2d:
                     main_ax.set_xlim(transform_x_lim_all)
                 else:
@@ -641,9 +671,9 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             legend_labels = []
             
             if display_check.get_status()[0]:
-                spine_scatter = main_ax.scatter(xs_spine, ys_spine, zs_spine, c='b', marker='o', s=40, label='Spine Points')
+                spine_scatter = main_ax.scatter(xs_spine, ys_spine, zs_spine, c='b', marker='o', s=40, label='Continuum Backbone')
                 legend_handles.append(spine_scatter)
-                legend_labels.append('Spine Points')
+                legend_labels.append('Continuum Backbone')
             if display_check.get_status()[1]:
                 tdcr_scatter = main_ax.scatter(xs_tdcr, ys_tdcr, zs_tdcr, c='g', marker='o', s=40, label='ROI Points')
                 legend_handles.append(tdcr_scatter)
@@ -651,11 +681,11 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             
             f = 12
             lp = 20
-            main_ax.set_xlabel('X', fontsize=f, labelpad=lp)
-            main_ax.set_ylabel('Y', fontsize=f, labelpad=lp)
-            main_ax.set_zlabel('Z', fontsize=f, labelpad=lp)
-            main_ax.tick_params(axis='both', which='major', labelsize=24)
-            main_ax.tick_params(axis='both', which='minor', labelsize=18)
+            main_ax.set_xlabel('X', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=lp)
+            main_ax.set_ylabel('Y', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=lp)
+            main_ax.set_zlabel('Z', fontsize=AXIS_LABEL_FONT_SIZE, labelpad=lp)
+            main_ax.tick_params(axis='both', which='major', labelsize=TICK_MAJOR_FONT_SIZE)
+            main_ax.tick_params(axis='both', which='minor', labelsize=TICK_MINOR_FONT_SIZE)
             main_ax.tick_params(axis='x', pad=10)
             main_ax.tick_params(axis='y', pad=10)
             main_ax.tick_params(axis='z', pad=10)
@@ -668,15 +698,16 @@ def plot_row(considered_idx, mode_2d, show_spiral, deviation_plot_mode, show_all
             except Exception:
                 pass
         
-        if not show_all_2d and legend_handles:  # Use standard legend if not in all-2D mode
-            legend_ax.legend(legend_handles, legend_labels, loc='upper left', fontsize=13, frameon=True)
+        if show_legend and not show_all_2d and legend_handles:  # Use standard legend if not in all-2D mode
+            main_ax.legend(legend_handles, legend_labels, loc='upper left', bbox_to_anchor=(-0.1, 1.2), fontsize=LEGEND_ITEM_FONT_SIZE, frameon=True)
     
     plt.draw()
 def update(val):
     display_status = display_check.get_status()
     modes_status = modes_check.get_status()
     multi_status = multi_check.get_status()
-    options_status = options_check.get_status()
+    legend_status = legend_check.get_status()
+    transform_status = transform_check.get_status()
     
     mode_2d = modes_status[0]
     deviation_plot_mode = modes_status[1]
@@ -684,31 +715,31 @@ def update(val):
     show_all_deviations = multi_status[0]
     show_all_2d = multi_status[1]
     show_average = multi_status[2]
-    show_transform = options_status[0]
+    show_legend = legend_status[0]
+    
+    # Get list of selected transforms
+    selected_transforms = [transform_labels[i] for i, status in enumerate(transform_status) if status]
     
     # Hide slider when showing all/average in deviation mode or all in 2D mode
     hide_slider = deviation_plot_mode and (show_all_deviations or show_average) or (mode_2d and show_all_2d and not deviation_plot_mode)
     slider_ax.set_visible(not hide_slider)
     
     if hide_slider:
-        plot_row(0, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform)
+        plot_row(0, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, selected_transforms, show_legend)
     else:
-        plot_row(int(slider.val) - 1, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, show_transform)
+        plot_row(int(slider.val) - 1, mode_2d, show_spiral, deviation_plot_mode, show_all_deviations, show_average, show_all_2d, selected_transforms, show_legend)
 def toggle_visibility(label):
     update(None)
-
-
 
 
 display_check.on_clicked(toggle_visibility)
 modes_check.on_clicked(toggle_visibility)
 multi_check.on_clicked(toggle_visibility)
-options_check.on_clicked(toggle_visibility)
+legend_check.on_clicked(toggle_visibility)
+transform_check.on_clicked(toggle_visibility)
 slider.on_changed(update)
 
 
-
-
 # Initial plot with new parameter
-plot_row(0, False, True, True, True, True, False, False)
+plot_row(0, False, True, True, True, True, False, [], True)
 plt.show()
