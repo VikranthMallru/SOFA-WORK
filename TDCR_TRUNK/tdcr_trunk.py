@@ -828,31 +828,31 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         elif key == "9":
             # Run the sequences sequentially using a wrapper method
             self.run_sequential_cable_steps([
-                {
-                    'step_sizes': [0.01, 0.0, 0.0],
-                    'interval': 0.01,
-                    'goals': [140.0, 0.0, 0.0],
-                    'log_interval': 1.0
+                # {
+                    # 'step_sizes': [0.01, 0.01, 0.01],
+                    # 'interval': 0.01,
+                    # 'goals': [30.0, 30.0, 30.0],
+                    # 'log_interval': 1.0
                 # }
-                },
-                {
-                    'step_sizes': [-0.01, 0, 0],
-                    'interval': 0.01,
-                    'goals': [0.0, 0.0, 0.0],
-                    'log_interval': 1.0
-                },
-                {
-                    'step_sizes': [0.01, 0.01, 0.01],
-                    'interval': 0.01,
-                    'goals': [40.0, 40.0, 40.0],
-                    'log_interval': 1.0
-                },
+                # },
                 {
                     'step_sizes': [0.01, 0, 0],
                     'interval': 0.01,
-                    'goals': [140.0, 40.0, 40.0],
+                    'goals': [140.0, 0.0, 0.0],
                     'log_interval': 1.0
-                }
+                },
+                # {
+                #     'step_sizes': [0.01, 0.01, 0.01],
+                #     'interval': 0.01,
+                #     'goals': [40.0, 40.0, 40.0],
+                #     'log_interval': 1.0
+                # },
+                # {
+                #     'step_sizes': [0.01, 0, 0],
+                #     'interval': 0.01,
+                #     'goals': [140.0, 40.0, 40.0],
+                #     'log_interval': 1.0
+                # }
             ])
         disp_values = [c.CableConstraint.value[0] for c in self.cables]
         print("Cable displacements: [{}]".format(", ".join(f"{d:.2f}" for d in disp_values)))
@@ -999,6 +999,9 @@ def TDCR_trunk(parentNode, name="TDCR_trunk",
     cable3.CableConstraint.maxForce = maxForce
     
     roi_centers = [c1_r[-1], c2_r[-1], c3_r[-1]]  # Only use the first point of each cable
+
+    roi_centers = c1_r + c2_r + c3_r
+
     epsilons = [5.0] * len(roi_centers)
     roi_boxes = make_roi_boxes(roi_centers, epsilons)
     roi_nodes = add_boxrois(soft_body, roi_boxes)
@@ -1054,6 +1057,6 @@ def createScene(rootNode):
     # rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields showWireframe"
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
 
-    TDCR_trunk(rootNode,minForce=0.1, initial_theta_deg= 0.0)  # Set your desired initial_theta_deg here
+    TDCR_trunk(rootNode,minForce=0.1, initial_theta_deg= 45.0)  # Set your desired initial_theta_deg here
 
     return rootNode

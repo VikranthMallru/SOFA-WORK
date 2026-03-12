@@ -268,28 +268,122 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
     points_tdcr = np.vstack([xs_tdcr, ys_tdcr, zs_tdcr]).T
     # Get circle fit cached
     center, radius, normal, e1, e2, _ = circle_fit_cache[actual_idx]
+    # if deviation_plot_mode:
+    #     legend_handles = []
+        
+    #     # --- 1. PRE-CALCULATE MAX LENGTH (THE FIXED RULER) ---
+    #     max_len_global = 0
+    #     for i in considered_frames:
+    #         idx = i + IGNORE_FIRST_N_FRAMES
+    #         pts_temp = np.vstack([df_spine.loc[idx, x_cols_spine].values,
+    #                              df_spine.loc[idx, y_cols_spine].values,
+    #                              df_spine.loc[idx, z_cols_spine].values]).T
+    #         max_len_global = max(max_len_global, calculate_arc_length(pts_temp)[-1])
+        
+    #     common_x = np.linspace(0, max_len_global, 300)
+
+    #     # Get status of the new toggle
+    #     show_heatmap = modes_check.get_status()[2]
+
+    #     if show_heatmap:
+    #         # --- HEATMAP MODE ---
+    #         all_interp_devs = []
+            
+    #         # Recalculate average data (needed for heatmap calculation)
+    #         for i in considered_frames:
+    #             idx = i + IGNORE_FIRST_N_FRAMES
+    #             c, r, n, v1, v2, _ = circle_fit_cache[idx]
+    #             pts = np.vstack([df_spine.loc[idx, x_cols_spine].values,
+    #                              df_spine.loc[idx, y_cols_spine].values,
+    #                              df_spine.loc[idx, z_cols_spine].values]).T
+    #             if c is None or r == np.inf: continue
+    #             deviations = np.abs(np.linalg.norm(pts - c, axis=1) - r)
+    #             actual_distances = calculate_arc_length(pts)
+    #             # 'right=np.nan' is critical here to show shrinking
+    #             interp_dev = np.interp(common_x, actual_distances, deviations, right=np.nan)
+    #             all_interp_devs.append(interp_dev)
+            
+    #         heatmap_data = np.vstack(all_interp_devs)
+            
+    #         # Use hexbin to plot the 2D density of deviation points
+    #         x_mesh, y_mesh = np.meshgrid(common_x, np.arange(heatmap_data.shape[0]))
+    #         # C=heatmap_data.flatten() uses the deviation value itself for color
+    #         # Reduce gridsize if it looks too blocky
+    #         deviation_ax.hexbin(x_mesh.flatten(), heatmap_data.flatten(), C=heatmap_data.flatten(),
+    #                            gridsize=50, cmap='inferno', bins='log', mincnt=1, edgecolors='none', alpha=0.8)
+            
+    #         deviation_ax.set_title('Deviation Density Heatmap (All Frames)', fontsize=PLOT_TITLE_FONT_SIZE)
+            
+    #     else:
+    #         # --- EXISTING LINE PLOTS (AVERAGE AND ALL FRAMES) ---
+    #         if show_average or show_all_deviations:
+    #             all_interp_devs = []
+    #             for i in considered_frames:
+    #                 idx = i + IGNORE_FIRST_N_FRAMES
+    #                 c, r, n, v1, v2, _ = circle_fit_cache[idx]
+    #                 pts = np.vstack([df_spine.loc[idx, x_cols_spine].values,
+    #                                  df_spine.loc[idx, y_cols_spine].values,
+    #                                  df_spine.loc[idx, z_cols_spine].values]).T
+    #                 if c is None or r == np.inf: continue
+    #                 deviations = np.abs(np.linalg.norm(pts - c, axis=1) - r)
+    #                 actual_distances = calculate_arc_length(pts)
+    #                 interp_dev = np.interp(common_x, actual_distances, deviations, right=np.nan)
+    #                 all_interp_devs.append(interp_dev)
+    #             avg_devs = np.nanmean(all_interp_devs, axis=0)
+
+    #         # Plot all individual lines
+    #         if show_all_deviations:
+    #             num_frames = len(considered_frames)
+    #             colors = cm.viridis(np.linspace(0, 1, num_frames))
+    #             alpha_val = 0.3 if show_average else 1.0
+    #             for j, i in enumerate(considered_frames):
+    #                 idx = i + IGNORE_FIRST_N_FRAMES
+    #                 c, r, n, v1, v2, _ = circle_fit_cache[idx]
+    #                 points = np.vstack([df_spine.loc[idx, x_cols_spine].values,
+    #                                     df_spine.loc[idx, y_cols_spine].values,
+    #                                     df_spine.loc[idx, z_cols_spine].values]).T
+    #                 if c is None or r == np.inf: continue
+    #                 deviations = np.abs(np.linalg.norm(points - c, axis=1) - r)
+    #                 x_vals = calculate_arc_length(points) # Frame-specific length
+    #                 deviation_ax.plot(x_vals, deviations, color=colors[j], alpha=alpha_val, linewidth=2)
+
+    #         # Plot average line
+    #         if show_average:
+    #             avg_color = 'r' if show_all_deviations else 'tab:blue'
+    #             avg_line, = deviation_ax.plot(common_x, avg_devs, avg_color + '-', linewidth=5, label='Average Deviation')
+    #             legend_handles.append(avg_line)
+
+    #         # Plot single frame (Slider Mode)
+    #         if not show_all_deviations and not show_average:
+    #             if center is not None and radius != np.inf:
+    #                 deviations_single = np.abs(np.linalg.norm(points_spine - center, axis=1) - radius)
+    #                 x_vals_single = calculate_arc_length(points_spine)
+    #                 single_line, = deviation_ax.plot(x_vals_single, deviations_single, 'b-o', linewidth=2, label=f'Frame {actual_idx+1}')
+    #                 legend_handles.append(single_line)
+
+    #         deviation_ax.set_title(f'Deviation Plot', fontsize=PLOT_TITLE_FONT_SIZE)
+
+    #     # --- 6. FIX THE AXES (IMPORTANT) ---
+    #     deviation_ax.set_xlabel('Arc Length (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+    #     deviation_ax.set_ylabel('Deviation (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+    #     deviation_ax.set_xlim(0, max_len_global) # THIS FREEZES THE RULER
+    #     deviation_ax.set_ylim(0, 5) # Set this max deviation in mm
+    #     deviation_ax.grid(True)
+    #     if show_legend and legend_handles and not show_heatmap:
+    #          deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, loc='upper left', bbox_to_anchor=(-0.15, 1.15))
     if deviation_plot_mode:
         legend_handles = []
         
-        # --- 1. PRE-CALCULATE MAX LENGTH (THE FIXED RULER) ---
-        max_len_global = 0
-        for i in considered_frames:
-            idx = i + IGNORE_FIRST_N_FRAMES
-            pts_temp = np.vstack([df_spine.loc[idx, x_cols_spine].values,
-                                 df_spine.loc[idx, y_cols_spine].values,
-                                 df_spine.loc[idx, z_cols_spine].values]).T
-            max_len_global = max(max_len_global, calculate_arc_length(pts_temp)[-1])
+        # --- 1. USE POINT INDEX FOR X-AXIS ---
+        # Get the total number of points per frame to use as our fixed X-axis
+        num_points = len(xs_spine)
+        point_indices = np.arange(num_points)
         
-        common_x = np.linspace(0, max_len_global, 300)
-
-        # Get status of the new toggle
         show_heatmap = modes_check.get_status()[2]
 
-        if show_heatmap:
-            # --- HEATMAP MODE ---
-            all_interp_devs = []
-            
-            # Recalculate average data (needed for heatmap calculation)
+        # --- 2. DATA PROCESSING (No Arc Length, No Interpolation) ---
+        if show_heatmap or show_average or show_all_deviations:
+            all_devs = []
             for i in considered_frames:
                 idx = i + IGNORE_FIRST_N_FRAMES
                 c, r, n, v1, v2, _ = circle_fit_cache[idx]
@@ -297,81 +391,75 @@ def plot_row(considered_idx, mode_2d, deviation_plot_mode, show_all_deviations, 
                                  df_spine.loc[idx, y_cols_spine].values,
                                  df_spine.loc[idx, z_cols_spine].values]).T
                 if c is None or r == np.inf: continue
+                
+                # Direct deviation calculation without length tracking
                 deviations = np.abs(np.linalg.norm(pts - c, axis=1) - r)
-                actual_distances = calculate_arc_length(pts)
-                # 'right=np.nan' is critical here to show shrinking
-                interp_dev = np.interp(common_x, actual_distances, deviations, right=np.nan)
-                all_interp_devs.append(interp_dev)
+                all_devs.append(deviations)
             
-            heatmap_data = np.vstack(all_interp_devs)
-            
-            # Use hexbin to plot the 2D density of deviation points
-            x_mesh, y_mesh = np.meshgrid(common_x, np.arange(heatmap_data.shape[0]))
-            # C=heatmap_data.flatten() uses the deviation value itself for color
-            # Reduce gridsize if it looks too blocky
-            deviation_ax.hexbin(x_mesh.flatten(), heatmap_data.flatten(), C=heatmap_data.flatten(),
-                               gridsize=50, cmap='inferno', bins='log', mincnt=1, edgecolors='none', alpha=0.8)
-            
-            deviation_ax.set_title('Deviation Density Heatmap (All Frames)', fontsize=PLOT_TITLE_FONT_SIZE)
-            
+            if all_devs:
+                avg_devs = np.nanmean(all_devs, axis=0)
+                heatmap_data = np.vstack(all_devs)
+
+        # --- 3. DRAWING ---
+        if show_heatmap:
+            # Heatmap mapped directly to point indices
+            x_mesh, _ = np.meshgrid(point_indices, np.arange(len(all_devs)))
+            deviation_ax.hexbin(x_mesh.flatten(), heatmap_data.flatten(), 
+                               gridsize=(num_points, 40), cmap='inferno', mincnt=1, alpha=0.9)
+            deviation_ax.set_title('Deviation Density Heatmap', fontsize=PLOT_TITLE_FONT_SIZE)
+
+        # --- 4. FORMATTING ---
+        deviation_ax.set_xlim(0, num_points - 1) 
+        deviation_ax.set_ylim(0, 5)
+        
+        # ADD THIS LINE: Forces the X-axis to only show your exact point integers (0, 1, 2...)
+        deviation_ax.set_xticks(point_indices)
+        
+        deviation_ax.set_xlabel('Point Index', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.set_ylabel('Deviation (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        deviation_ax.grid(True, alpha=0.3)
+        if show_legend and legend_handles and not show_heatmap:
+            deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, 
+                                loc='upper left', bbox_to_anchor=(-0.15, 1.15))
+        
         else:
-            # --- EXISTING LINE PLOTS (AVERAGE AND ALL FRAMES) ---
-            if show_average or show_all_deviations:
-                all_interp_devs = []
-                for i in considered_frames:
+            # Standard Line Plots
+            if show_all_deviations:
+                num_frames = len(considered_frames)
+                colors = cm.viridis(np.linspace(0, 1, num_frames))
+                for j, i in enumerate(considered_frames):
                     idx = i + IGNORE_FIRST_N_FRAMES
                     c, r, n, v1, v2, _ = circle_fit_cache[idx]
                     pts = np.vstack([df_spine.loc[idx, x_cols_spine].values,
                                      df_spine.loc[idx, y_cols_spine].values,
                                      df_spine.loc[idx, z_cols_spine].values]).T
                     if c is None or r == np.inf: continue
-                    deviations = np.abs(np.linalg.norm(pts - c, axis=1) - r)
-                    actual_distances = calculate_arc_length(pts)
-                    interp_dev = np.interp(common_x, actual_distances, deviations, right=np.nan)
-                    all_interp_devs.append(interp_dev)
-                avg_devs = np.nanmean(all_interp_devs, axis=0)
+                    devs = np.abs(np.linalg.norm(pts - c, axis=1) - r)
+                    deviation_ax.plot(point_indices, devs, color=colors[j], alpha=0.3 if show_average else 1.0)
 
-            # Plot all individual lines
-            if show_all_deviations:
-                num_frames = len(considered_frames)
-                colors = cm.viridis(np.linspace(0, 1, num_frames))
-                alpha_val = 0.3 if show_average else 1.0
-                for j, i in enumerate(considered_frames):
-                    idx = i + IGNORE_FIRST_N_FRAMES
-                    c, r, n, v1, v2, _ = circle_fit_cache[idx]
-                    points = np.vstack([df_spine.loc[idx, x_cols_spine].values,
-                                        df_spine.loc[idx, y_cols_spine].values,
-                                        df_spine.loc[idx, z_cols_spine].values]).T
-                    if c is None or r == np.inf: continue
-                    deviations = np.abs(np.linalg.norm(points - c, axis=1) - r)
-                    x_vals = calculate_arc_length(points) # Frame-specific length
-                    deviation_ax.plot(x_vals, deviations, color=colors[j], alpha=alpha_val, linewidth=2)
-
-            # Plot average line
             if show_average:
-                avg_color = 'r' if show_all_deviations else 'tab:blue'
-                avg_line, = deviation_ax.plot(common_x, avg_devs, avg_color + '-', linewidth=5, label='Average Deviation')
+                avg_line, = deviation_ax.plot(point_indices, avg_devs, 'r-', linewidth=4, label='Average Error')
                 legend_handles.append(avg_line)
 
-            # Plot single frame (Slider Mode)
             if not show_all_deviations and not show_average:
+                # Single frame view (Slider)
                 if center is not None and radius != np.inf:
-                    deviations_single = np.abs(np.linalg.norm(points_spine - center, axis=1) - radius)
-                    x_vals_single = calculate_arc_length(points_spine)
-                    single_line, = deviation_ax.plot(x_vals_single, deviations_single, 'b-o', linewidth=2, label=f'Frame {actual_idx+1}')
-                    legend_handles.append(single_line)
+                    devs_single = np.abs(np.linalg.norm(points_spine - center, axis=1) - radius)
+                    single_l, = deviation_ax.plot(point_indices, devs_single, 'b-o', label=f'Frame {actual_idx+1}')
+                    legend_handles.append(single_l)
 
-            deviation_ax.set_title(f'Deviation Plot', fontsize=PLOT_TITLE_FONT_SIZE)
-
-        # --- 6. FIX THE AXES (IMPORTANT) ---
-        deviation_ax.set_xlabel('Arc Length (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
+        # --- 4. FORMATTING ---
+        deviation_ax.set_xlim(0, num_points - 1) 
+        deviation_ax.set_ylim(0, 5)
+        # Reverted the axis label here
+        deviation_ax.set_xlabel('Point Index', fontsize=AXIS_LABEL_FONT_SIZE)
         deviation_ax.set_ylabel('Deviation (mm)', fontsize=AXIS_LABEL_FONT_SIZE)
-        deviation_ax.set_xlim(0, max_len_global) # THIS FREEZES THE RULER
-        deviation_ax.set_ylim(0, 5) # Set this max deviation in mm
-        deviation_ax.grid(True)
+        deviation_ax.grid(True, alpha=0.3)
         if show_legend and legend_handles and not show_heatmap:
-             deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, loc='upper left', bbox_to_anchor=(-0.15, 1.15))
-        
+            deviation_ax.legend(handles=legend_handles, fontsize=LEGEND_ITEM_FONT_SIZE, 
+                                loc='upper left', bbox_to_anchor=(-0.15, 1.15))
+
+
     else:
         # Plot 2D or 3D visualization
         if mode_2d:
