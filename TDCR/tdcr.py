@@ -399,22 +399,22 @@ class TDCRController(Sofa.Core.Controller):
             self.cable_stepper_to_goal(step_sizes=[0.1, 0, 0], interval=0.2, goals=[170.0, 0, 0])
         elif key == "9":
             # Reset all cables to 0.0
-            for i in range(3):
-                self.cables[i].CableConstraint.value = [0.0]
+            # for i in range(3):
+            #     self.cables[i].CableConstraint.value = [0.0]
 
             def sequence():
                 self.blocking_cable_stepper_to_goal_with_log_interval(
+                    step_sizes=[0.01, 0.01, 0.01],
+                    interval=0.01,
+                    goals=[30.0,30.0, 30.0],
+                    log_interval=1.0
+                )
+                self.blocking_cable_stepper_to_goal_with_log_interval(
                     step_sizes=[0.01, 0.0, 0.0],
                     interval=0.01,
-                    goals=[70.0,0.0, 0.0],
+                    goals=[70.0, 30.0, 30.0],
                     log_interval=10.0
                 )
-                # self.blocking_cable_stepper_to_goal_with_log_interval(
-                #     step_sizes=[0.01, 0, 0],
-                #     interval=0.01,
-                #     goals=[70.0, 30.0, 30.0],
-                #     log_interval=10.0
-                # )
 
             threading.Thread(target=sequence, daemon=True).start()
         elif key == "8":
@@ -889,7 +889,7 @@ def createScene(rootNode):
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
     TDCR(rootNode,
          enable_theta_optimization_cables=False,
-         initial_theta_deg=45.0, resolution_deg=45,
+         initial_theta_deg=0.0, resolution_deg=45,
          minForce=0.1)  # Set initial_theta_deg to 0.0 for no rotation
 
     # add_rigid_object_from_stl(
