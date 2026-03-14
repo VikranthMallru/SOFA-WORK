@@ -828,17 +828,17 @@ class TDCR_trunk_Controller(Sofa.Core.Controller):
         elif key == "9":
             # Run the sequences sequentially using a wrapper method
             self.run_sequential_cable_steps([
-                # {
-                    # 'step_sizes': [0.01, 0.01, 0.01],
-                    # 'interval': 0.01,
-                    # 'goals': [30.0, 30.0, 30.0],
-                    # 'log_interval': 1.0
+                {
+                    'step_sizes': [0.01, 0.01, 0.01],
+                    'interval': 0.01,
+                    'goals': [30.0, 30.0, 30.0],
+                    'log_interval': 1.0
                 # }
-                # },
+                },
                 {
                     'step_sizes': [0.01, 0, 0],
                     'interval': 0.01,
-                    'goals': [140.0, 0.0, 0.0],
+                    'goals': [140.0, 30.0, 30.0],
                     'log_interval': 1.0
                 },
                 # {
@@ -1057,6 +1057,6 @@ def createScene(rootNode):
     # rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields showWireframe"
     rootNode.VisualStyle.displayFlags = "showVisual showInteractionForceFields"
 
-    TDCR_trunk(rootNode,minForce=0.1, initial_theta_deg= 45.0)  # Set your desired initial_theta_deg here
+    TDCR_trunk(rootNode,minForce=0.1, initial_theta_deg= 0.0)  # Set your desired initial_theta_deg here
 
     return rootNode

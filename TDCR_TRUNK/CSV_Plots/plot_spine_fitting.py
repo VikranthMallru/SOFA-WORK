@@ -9,15 +9,15 @@ from matplotlib import cm  # Added for colormaps
 
 
 # ------- CONFIG: Edit these to control frame skipping -------
-# IGNORE_FIRST_N_FRAMES = 11
-IGNORE_FIRST_N_FRAMES = 47      
+IGNORE_FIRST_N_FRAMES = 73
+# IGNORE_FIRST_N_FRAMES = 47      
 IGNORE_FIRST_X_DISPLACEMENT = 4.0   
-EVERY_N_FRAMES = 1 #min 1
+EVERY_N_FRAMES = 5 #min 1
 REFERENCE_FRAME = 0  # New: Fixed frame for plane fitting (e.g., 0 for initial state)
-# IGNORE_FRAMES = [0,1,2,3,7] 
+# IGNORE_FRAMES = [] 
 # Add frames 121 to 144 to the ignore list
 
-IGNORE_FRAMES = list(range(76, 107))
+IGNORE_FRAMES = list(range(124, 144))
 # IGNORE_FRAMES = []  # Add specific frame numbers (actual indices) to ignore, e.g., [10, 25, 50]
 # Font size configuration variables
 SLIDER_LABEL_FONT_SIZE = 16
